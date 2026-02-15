@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Arbitrage Report</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a0e27;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        .container { max-width: 1600px; margin: 0 auto; }
+        h1 { 
+            color: #00ff88;
+            margin: 30px 0;
+            font-size: 2.5em;
+            text-align: center;
+            text-shadow: 0 0 20px rgba(0,255,136,0.5);
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #1a1f3a 0%, #2a2f4a 100%);
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #00ff8833;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .stat-value {
+            font-size: 2.5em;
+            color: #00ff88;
+            font-weight: bold;
+        }
+        .stat-label {
+            color: #888;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 30px 0;
+            background: #1a1f3a;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+        th {
+            background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
+            color: #0a0e27;
+            padding: 18px 12px;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.8em;
+            letter-spacing: 0.5px;
+        }
+        td {
+            padding: 16px 12px;
+            border-bottom: 1px solid #2a2f4a;
+            font-size: 0.9em;
+        }
+        tr:hover {
+            background: #252a45;
+        }
+        .profit { 
+            color: #00ff88;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .price { color: #ffaa00; font-weight: 600; }
+        .location { color: #6666ff; }
+        .model-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: 600;
+            background: #2a2f4a;
+            color: #00ff88;
+            border: 1px solid #00ff8844;
+        }
+        .high-profit { 
+            background: #00ff8822; 
+            color: #00ff88; 
+            border: 1px solid #00ff88;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .medium-profit { 
+            background: #ffaa0022; 
+            color: #ffaa00; 
+            border: 1px solid #ffaa00;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        a { 
+            color: #6666ff; 
+            text-decoration: none;
+            font-weight: 600;
+        }
+        a:hover { 
+            color: #8888ff; 
+            text-decoration: underline; 
+        }
+        .timestamp {
+            text-align: center;
+            color: #666;
+            margin-top: 40px;
+            font-size: 0.9em;
+        }
+        .no-data {
+            text-align: center;
+            padding: 60px 20px;
+            color: #888;
+            font-size: 1.2em;
+        }
+        .car-title {
+            font-weight: 600;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏎️ Car Arbitrage Opportunities</h1>
+        <p style="text-align: center; color: #888; margin-bottom: 40px;">
+            Liverpool → Northern Ireland | Drift & Race Scene
+        </p>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="total-deals">0</div>
+                <div class="stat-label">Profitable Deals</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="total-profit">£0</div>
+                <div class="stat-label">Total Potential Profit</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avg-profit">£0</div>
+                <div class="stat-label">Average Profit/Car</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="best-margin">0%</div>
+                <div class="stat-label">Best Profit Margin</div>
+            </div>
+        </div>
+        
+        <table id="deals-table">
+            <thead>
+                <tr>
+                    <th>Model</th>
+                    <th>Title</th>
+                    <th>Buy Price</th>
+                    <th>Sell Price (NI)</th>
+                    <th>Net Profit</th>
+                    <th>Margin</th>
+                    <th>Location</th>
+                    <th>Distance</th>
+                    <th>Details</th>
+                    <th>Link</th>
+                </tr>
+            </thead>
+            <tbody id="deals-body">
+            </tbody>
+        </table>
+        
+        <div class="timestamp">
+            Generated: <span id="timestamp"></span>
+        </div>
+    </div>
+    
+    <script>
+        // Car data from CSV
+        const carData = [
+            {model:"mitsubishi_evo",title:"BMW E46 330i Manual",price:"£8500",ni_price:"£12000",profit:"£3050",location:"Manchester",distance:"31.2",year:"2004",mileage:"89000",url:"https://autotrader.co.uk/1",margin:"35.9%"},
+{model:"mitsubishi_evo",title:"Lexus IS200 Sport",price:"£4200",ni_price:"£7700",profit:"£3050",location:"Chester",distance:"15.6",year:"2003",mileage:"112000",url:"https://autotrader.co.uk/2",margin:"72.6%"},
+{model:"mitsubishi_evo",title:"BMW E36 328i Sport",price:"£5800",ni_price:"£9300",profit:"£3050",location:"Warrington",distance:"16.3",year:"1998",mileage:"145000",url:"https://gumtree.com/1",margin:"52.6%"},
+{model:"nissan_skyline",title:"BMW E46 330i Manual",price:"£8500",ni_price:"£13500",profit:"£4550",location:"Manchester",distance:"31.2",year:"2004",mileage:"89000",url:"https://autotrader.co.uk/1",margin:"53.5%"},
+{model:"nissan_skyline",title:"Lexus IS200 Sport",price:"£4200",ni_price:"£9200",profit:"£4550",location:"Chester",distance:"15.6",year:"2003",mileage:"112000",url:"https://autotrader.co.uk/2",margin:"108.3%"},
+{model:"nissan_skyline",title:"Nissan 200SX S14",price:"£16500",ni_price:"£21500",profit:"£4550",location:"Preston",distance:"27.2",year:"1999",mileage:"95000",url:"https://pistonheads.com/1",margin:"27.6%"},
+{model:"nissan_skyline",title:"BMW E36 328i Sport",price:"£5800",ni_price:"£10800",profit:"£4550",location:"Warrington",distance:"16.3",year:"1998",mileage:"145000",url:"https://gumtree.com/1",margin:"78.4%"},
+{model:"subaru_impreza",title:"BMW E46 330i Manual",price:"£8500",ni_price:"£11000",profit:"£2050",location:"Manchester",distance:"31.2",year:"2004",mileage:"89000",url:"https://autotrader.co.uk/1",margin:"24.1%"},
+{model:"subaru_impreza",title:"Lexus IS200 Sport",price:"£4200",ni_price:"£6700",profit:"£2050",location:"Chester",distance:"15.6",year:"2003",mileage:"112000",url:"https://autotrader.co.uk/2",margin:"48.8%"},
+{model:"subaru_impreza",title:"BMW E36 328i Sport",price:"£5800",ni_price:"£8300",profit:"£2050",location:"Warrington",distance:"16.3",year:"1998",mileage:"145000",url:"https://gumtree.com/1",margin:"35.3%"},
+{model:"bmw_e46",title:"BMW E46 330i Manual",price:"£8500",ni_price:"£10500",profit:"£1550",location:"Manchester",distance:"31.2",year:"2004",mileage:"89000",url:"https://autotrader.co.uk/1",margin:"18.2%"},
+{model:"bmw_e46",title:"Lexus IS200 Sport",price:"£4200",ni_price:"£6200",profit:"£1550",location:"Chester",distance:"15.6",year:"2003",mileage:"112000",url:"https://autotrader.co.uk/2",margin:"36.9%"},
+{model:"bmw_e46",title:"BMW E36 328i Sport",price:"£5800",ni_price:"£7800",profit:"£1550",location:"Warrington",distance:"16.3",year:"1998",mileage:"145000",url:"https://gumtree.com/1",margin:"26.7%"},
+{model:"toyota_supra",title:"BMW E46 330i Manual",price:"£8500",ni_price:"£14500",profit:"£5550",location:"Manchester",distance:"31.2",year:"2004",mileage:"89000",url:"https://autotrader.co.uk/1",margin:"65.3%"},
+{model:"toyota_supra",title:"Lexus IS200 Sport",price:"£4200",ni_price:"£10200",profit:"£5550",location:"Chester",distance:"15.6",year:"2003",mileage:"112000",url:"https://autotrader.co.uk/2",margin:"132.1%"},
+{model:"toyota_supra",title:"Nissan 200SX S14",price:"£16500",ni_price:"£22500",profit:"£5550",location:"Preston",distance:"27.2",year:"1999",mileage:"95000",url:"https://pistonheads.com/1",margin:"33.6%"},
+{model:"toyota_supra",title:"BMW E36 328i Sport",price:"£5800",ni_price:"£11800",profit:"£5550",location:"Warrington",distance:"16.3",year:"1998",mileage:"145000",url:"https://gumtree.com/1",margin:"95.7%"},
+{model:"bmw_e36",title:"Lexus IS200 Sport",price:"£4200",ni_price:"£6000",profit:"£1350",location:"Chester",distance:"15.6",year:"2003",mileage:"112000",url:"https://autotrader.co.uk/2",margin:"32.1%"},
+{model:"bmw_e36",title:"BMW E36 328i Sport",price:"£5800",ni_price:"£7600",profit:"£1350",location:"Warrington",distance:"16.3",year:"1998",mileage:"145000",url:"https://gumtree.com/1",margin:"23.3%"},
+{model:"lexus_is200",title:"Lexus IS200 Sport",price:"£4200",ni_price:"£5400",profit:"£750",location:"Chester",distance:"15.6",year:"2003",mileage:"112000",url:"https://autotrader.co.uk/2",margin:"17.9%"},
+{model:"mazda_rx",title:"BMW E46 330i Manual",price:"£8500",ni_price:"£11500",profit:"£2550",location:"Manchester",distance:"31.2",year:"2004",mileage:"89000",url:"https://autotrader.co.uk/1",margin:"30.0%"},
+{model:"mazda_rx",title:"Lexus IS200 Sport",price:"£4200",ni_price:"£7200",profit:"£2550",location:"Chester",distance:"15.6",year:"2003",mileage:"112000",url:"https://autotrader.co.uk/2",margin:"60.7%"},
+{model:"mazda_rx",title:"BMW E36 328i Sport",price:"£5800",ni_price:"£8800",profit:"£2550",location:"Warrington",distance:"16.3",year:"1998",mileage:"145000",url:"https://gumtree.com/1",margin:"44.0%"},
+{model:"honda_civic",title:"BMW E46 330i Manual",price:"£8500",ni_price:"£11000",profit:"£2050",location:"Manchester",distance:"31.2",year:"2004",mileage:"89000",url:"https://autotrader.co.uk/1",margin:"24.1%"},
+{model:"honda_civic",title:"Lexus IS200 Sport",price:"£4200",ni_price:"£6700",profit:"£2050",location:"Chester",distance:"15.6",year:"2003",mileage:"112000",url:"https://autotrader.co.uk/2",margin:"48.8%"},
+{model:"honda_civic",title:"BMW E36 328i Sport",price:"£5800",ni_price:"£8300",profit:"£2050",location:"Warrington",distance:"16.3",year:"1998",mileage:"145000",url:"https://gumtree.com/1",margin:"35.3%"},
+{model:"nissan_200sx",title:"BMW E46 330i Manual",price:"£8500",ni_price:"£12500",profit:"£3550",location:"Manchester",distance:"31.2",year:"2004",mileage:"89000",url:"https://autotrader.co.uk/1",margin:"41.8%"},
+{model:"nissan_200sx",title:"Lexus IS200 Sport",price:"£4200",ni_price:"£8200",profit:"£3550",location:"Chester",distance:"15.6",year:"2003",mileage:"112000",url:"https://autotrader.co.uk/2",margin:"84.5%"},
+{model:"nissan_200sx",title:"Nissan 200SX S14",price:"£16500",ni_price:"£20500",profit:"£3550",location:"Preston",distance:"27.2",year:"1999",mileage:"95000",url:"https://pistonheads.com/1",margin:"21.5%"},
+{model:"nissan_200sx",title:"BMW E36 328i Sport",price:"£5800",ni_price:"£9800",profit:"£3550",location:"Warrington",distance:"16.3",year:"1998",mileage:"145000",url:"https://gumtree.com/1",margin:"61.2%"},
+        ];
+        
+        // Populate timestamp
+        document.getElementById('timestamp').textContent = new Date().toLocaleString();
+        
+        // Calculate statistics
+        if (carData.length > 0) {
+            const totalDeals = carData.length;
+            const totalProfit = carData.reduce((sum, car) => {
+                const profit = parseInt(car.profit.replace(/[£,]/g, ''));
+                return sum + profit;
+            }, 0);
+            const avgProfit = Math.round(totalProfit / totalDeals);
+            const bestMargin = Math.max(...carData.map(car => 
+                parseFloat(car.margin.replace('%', ''))
+            ));
+            
+            // Update stats
+            document.getElementById('total-deals').textContent = totalDeals;
+            document.getElementById('total-profit').textContent = '£' + totalProfit.toLocaleString();
+            document.getElementById('avg-profit').textContent = '£' + avgProfit.toLocaleString();
+            document.getElementById('best-margin').textContent = bestMargin.toFixed(1) + '%';
+            
+            // Populate table
+            const tbody = document.getElementById('deals-body');
+            carData.forEach(car => {
+                const profit = parseInt(car.profit.replace(/[£,]/g, ''));
+                const profitClass = profit > 2000 ? 'high-profit' : 'medium-profit';
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><span class="model-badge">${car.model}</span></td>
+                    <td class="car-title">${car.title}</td>
+                    <td class="price">${car.price}</td>
+                    <td class="price">${car.ni_price}</td>
+                    <td><span class="${profitClass}">${car.profit}</span></td>
+                    <td>${car.margin}</td>
+                    <td class="location">${car.location}</td>
+                    <td>${car.distance} mi</td>
+                    <td>${car.year} | ${car.mileage} mi</td>
+                    <td><a href="${car.url}" target="_blank">View Listing →</a></td>
+                `;
+                tbody.appendChild(row);
+            });
+        } else {
+            // Show no data message
+            const tbody = document.getElementById('deals-body');
+            tbody.innerHTML = '<tr><td colspan="10" class="no-data">No profitable deals found yet. Run the scraper to find opportunities!</td></tr>';
+        }
+    </script>
+</body>
+</html>

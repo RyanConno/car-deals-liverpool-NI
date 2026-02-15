@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Arbitrage Report - Liverpool to NI</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: #e0e0e0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container { 
+            max-width: 1800px; 
+            margin: 0 auto; 
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        h1 { 
+            color: #00ff88;
+            margin: 30px 0 10px;
+            font-size: 3em;
+            text-shadow: 0 0 30px rgba(0,255,136,0.6);
+            font-weight: 800;
+        }
+        .subtitle {
+            color: #888;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+        }
+        .hero-text {
+            color: #aaa;
+            font-size: 0.95em;
+            max-width: 800px;
+            margin: 0 auto 20px;
+            line-height: 1.6;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin: 40px 0;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #1a1f3a 0%, #2a2f4a 100%);
+            padding: 30px;
+            border-radius: 16px;
+            border: 1px solid #00ff8833;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 35px rgba(0,255,136,0.2);
+        }
+        .stat-value {
+            font-size: 3em;
+            color: #00ff88;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .stat-label {
+            color: #888;
+            font-size: 0.95em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .table-container {
+            background: #1a1f3a;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            margin: 40px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
+            color: #0a0e27;
+            padding: 20px 15px;
+            text-align: left;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 1px;
+        }
+        td {
+            padding: 18px 15px;
+            border-bottom: 1px solid #2a2f4a;
+            font-size: 0.95em;
+        }
+        tbody tr {
+            transition: background 0.2s;
+        }
+        tbody tr:hover {
+            background: #252a45;
+            cursor: pointer;
+        }
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .profit { 
+            color: #00ff88;
+            font-weight: bold;
+            font-size: 1.15em;
+        }
+        .price { 
+            color: #ffaa00; 
+            font-weight: 600; 
+        }
+        .location { 
+            color: #6666ff; 
+        }
+        .model-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8em;
+            font-weight: 700;
+            background: #2a2f4a;
+            color: #00ff88;
+            border: 1px solid #00ff8866;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .high-profit { 
+            background: linear-gradient(135deg, #00ff8822 0%, #00ff8833 100%);
+            color: #00ff88; 
+            border: 1px solid #00ff88;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .medium-profit { 
+            background: linear-gradient(135deg, #ffaa0022 0%, #ffaa0033 100%);
+            color: #ffaa00; 
+            border: 1px solid #ffaa00;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        a { 
+            color: #6666ff; 
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s;
+        }
+        a:hover { 
+            color: #8888ff; 
+            text-decoration: underline; 
+        }
+        .car-title {
+            font-weight: 600;
+            color: #fff;
+            font-size: 1.05em;
+        }
+        .timestamp {
+            text-align: center;
+            color: #666;
+            margin: 60px 0 40px;
+            font-size: 0.9em;
+        }
+        .no-data {
+            text-align: center;
+            padding: 80px 20px;
+            color: #888;
+            font-size: 1.3em;
+        }
+        .filter-bar {
+            background: #1a1f3a;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-bar label {
+            color: #888;
+            font-size: 0.9em;
+            margin-right: 5px;
+        }
+        .filter-bar select, .filter-bar input {
+            background: #2a2f4a;
+            color: #e0e0e0;
+            border: 1px solid #00ff8833;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+        .link-btn {
+            background: linear-gradient(135deg, #6666ff 0%, #4444dd 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .link-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102,102,255,0.4);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏎️ Car Arbitrage Opportunities</h1>
+            <p class="subtitle">Liverpool → Northern Ireland | Drift & Race Scene</p>
+            <p class="hero-text">
+                Find profitable drift and race cars to buy near Liverpool and sell in Northern Ireland's thriving enthusiast market.
+                Based on real market research of NI drift scene demand and pricing differentials.
+            </p>
+        </header>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="total-deals">0</div>
+                <div class="stat-label">Profitable Deals</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="total-profit">£0</div>
+                <div class="stat-label">Total Potential Profit</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avg-profit">£0</div>
+                <div class="stat-label">Average Profit/Car</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="best-margin">0%</div>
+                <div class="stat-label">Best Profit Margin</div>
+            </div>
+        </div>
+
+        <div class="filter-bar">
+            <div>
+                <label>Filter by Model:</label>
+                <select id="model-filter">
+                    <option value="all">All Models</option>
+                </select>
+            </div>
+            <div>
+                <label>Min Profit:</label>
+                <select id="profit-filter">
+                    <option value="0">Any</option>
+                    <option value="1000">£1,000+</option>
+                    <option value="1500">£1,500+</option>
+                    <option value="2000">£2,000+</option>
+                    <option value="3000">£3,000+</option>
+                </select>
+            </div>
+            <div>
+                <label>Max Distance:</label>
+                <select id="distance-filter">
+                    <option value="100">100 miles</option>
+                    <option value="75">75 miles</option>
+                    <option value="50">50 miles</option>
+                    <option value="25">25 miles</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <table id="deals-table">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Title</th>
+                        <th>Buy Price</th>
+                        <th>Sell Price (NI)</th>
+                        <th>Net Profit</th>
+                        <th>Margin</th>
+                        <th>Location</th>
+                        <th>Distance</th>
+                        <th>Details</th>
+                        <th>Link</th>
+                    </tr>
+                </thead>
+                <tbody id="deals-body">
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="timestamp">
+            <strong>Sample Data Report</strong><br>
+            Generated: <span id="timestamp"></span><br>
+            <em>This is demonstration data. Run the scraper scripts to find real opportunities.</em>
+        </div>
+    </div>
+    
+    <script>
+        // SAMPLE CAR DATA (Replace with actual CSV data in production)
+        const carData = [
+            {
+                model: "BMW E46 330i",
+                title: "BMW E46 330Ci Sport Manual - Drift Ready",
+                price: "£8,500",
+                ni_price: "£10,950",
+                profit: "£2,000",
+                margin: "23.5%",
+                location: "Manchester",
+                distance: "31.2",
+                year: "2004",
+                mileage: "89,000",
+                url: "https://www.autotrader.co.uk/car-details/202602120001"
+            },
+            {
+                model: "Lexus IS200",
+                title: "Lexus IS200 Sport Manual - Immaculate",
+                price: "£4,200",
+                ni_price: "£5,650",
+                profit: "£1,000",
+                margin: "23.8%",
+                location: "Chester",
+                distance: "18.5",
+                year: "2003",
+                mileage: "112,000",
+                url: "https://www.autotrader.co.uk/car-details/202602120002"
+            },
+            {
+                model: "Nissan 200SX",
+                title: "Nissan 200SX S14 Kouki - Original SR20DET",
+                price: "£16,500",
+                ni_price: "£20,950",
+                profit: "£4,000",
+                margin: "24.2%",
+                location: "Preston",
+                distance: "27.8",
+                year: "1999",
+                mileage: "95,000",
+                url: "https://www.pistonheads.com/classifieds/used-cars/nissan/200sx/nissan-200sx-s14-kouki-sr20det-1999/15234567"
+            },
+            {
+                model: "BMW E36 328i",
+                title: "BMW E36 328i Sport Coupe - Clean Example",
+                price: "£5,800",
+                ni_price: "£7,750",
+                profit: "£1,500",
+                margin: "25.9%",
+                location: "Warrington",
+                distance: "16.3",
+                year: "1998",
+                mileage: "145,000",
+                url: "https://www.gumtree.com/p/cars-vans-motorbikes/bmw-e36-328i-sport/1487654321"
+            },
+            {
+                model: "Honda Civic Type R",
+                title: "Honda Civic Type R EP3 Championship White",
+                price: "£9,800",
+                ni_price: "£12,750",
+                profit: "£2,500",
+                margin: "25.5%",
+                location: "Bolton",
+                distance: "22.4",
+                year: "2005",
+                mileage: "78,000",
+                url: "https://www.autotrader.co.uk/car-details/202602120003"
+            },
+            {
+                model: "Nissan 200SX",
+                title: "Nissan 200SX S13 - Track/Drift Build",
+                price: "£11,200",
+                ni_price: "£15,650",
+                profit: "£4,000",
+                margin: "35.7%",
+                location: "Wigan",
+                distance: "14.7",
+                year: "1992",
+                mileage: "156,000",
+                url: "https://www.pistonheads.com/classifieds/used-cars/nissan/200sx/nissan-200sx-s13-drift/15234568"
+            },
+            {
+                model: "BMW E46 330i",
+                title: "BMW 330i Touring Manual - Rare Estate",
+                price: "£7,200",
+                ni_price: "£9,650",
+                profit: "£2,000",
+                margin: "27.8%",
+                location: "Blackpool",
+                distance: "44.2",
+                year: "2003",
+                mileage: "134,000",
+                url: "https://www.autotrader.co.uk/car-details/202602120004"
+            },
+            {
+                model: "Lexus IS200",
+                title: "Lexus IS200 SE Manual - Full History",
+                price: "£3,800",
+                ni_price: "£5,250",
+                profit: "£1,000",
+                margin: "26.3%",
+                location: "Southport",
+                distance: "19.8",
+                year: "2002",
+                mileage: "128,000",
+                url: "https://www.gumtree.com/p/cars-vans-motorbikes/lexus-is200-manual/1487654322"
+            },
+            {
+                model: "Mazda RX-7",
+                title: "Mazda RX-7 FD - Single Turbo Conversion",
+                price: "£18,500",
+                ni_price: "£21,950",
+                profit: "£3,000",
+                margin: "16.2%",
+                location: "Blackburn",
+                distance: "38.6",
+                year: "1995",
+                mileage: "87,000",
+                url: "https://www.pistonheads.com/classifieds/used-cars/mazda/rx-7/mazda-rx7-fd-single-turbo/15234569"
+            },
+            {
+                model: "BMW E36 M3",
+                title: "BMW E36 M3 3.2 Evolution - Manual",
+                price: "£14,800",
+                ni_price: "£17,250",
+                profit: "£2,000",
+                margin: "13.5%",
+                location: "Lancaster",
+                distance: "48.3",
+                year: "1997",
+                mileage: "112,000",
+                url: "https://www.autotrader.co.uk/car-details/202602120005"
+            }
+        ];
+        
+        let filteredData = [...carData];
+        
+        // Populate timestamp
+        document.getElementById('timestamp').textContent = new Date().toLocaleString();
+        
+        // Calculate and update statistics
+        function updateStats() {
+            if (filteredData.length === 0) {
+                document.getElementById('total-deals').textContent = '0';
+                document.getElementById('total-profit').textContent = '£0';
+                document.getElementById('avg-profit').textContent = '£0';
+                document.getElementById('best-margin').textContent = '0%';
+                return;
+            }
+            
+            const totalDeals = filteredData.length;
+            const totalProfit = filteredData.reduce((sum, car) => {
+                const profit = parseInt(car.profit.replace(/[£,]/g, ''));
+                return sum + profit;
+            }, 0);
+            const avgProfit = Math.round(totalProfit / totalDeals);
+            const bestMargin = Math.max(...filteredData.map(car => 
+                parseFloat(car.margin.replace('%', ''))
+            ));
+            
+            document.getElementById('total-deals').textContent = totalDeals;
+            document.getElementById('total-profit').textContent = '£' + totalProfit.toLocaleString();
+            document.getElementById('avg-profit').textContent = '£' + avgProfit.toLocaleString();
+            document.getElementById('best-margin').textContent = bestMargin.toFixed(1) + '%';
+        }
+        
+        // Populate table
+        function renderTable() {
+            const tbody = document.getElementById('deals-body');
+            tbody.innerHTML = '';
+            
+            if (filteredData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="no-data">No deals match your filters. Try adjusting the criteria above.</td></tr>';
+                return;
+            }
+            
+            filteredData.forEach(car => {
+                const profit = parseInt(car.profit.replace(/[£,]/g, ''));
+                const profitClass = profit >= 2000 ? 'high-profit' : 'medium-profit';
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><span class="model-badge">${car.model}</span></td>
+                    <td class="car-title">${car.title}</td>
+                    <td class="price">${car.price}</td>
+                    <td class="price">${car.ni_price}</td>
+                    <td><span class="${profitClass}">${car.profit}</span></td>
+                    <td>${car.margin}</td>
+                    <td class="location">${car.location}</td>
+                    <td>${car.distance} mi</td>
+                    <td>${car.year} | ${car.mileage} mi</td>
+                    <td><a href="${car.url}" target="_blank" class="link-btn">View →</a></td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        // Populate model filter options
+        function populateFilters() {
+            const models = [...new Set(carData.map(car => car.model))];
+            const modelFilter = document.getElementById('model-filter');
+            
+            models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                modelFilter.appendChild(option);
+            });
+        }
+        
+        // Apply filters
+        function applyFilters() {
+            const modelFilter = document.getElementById('model-filter').value;
+            const profitFilter = parseInt(document.getElementById('profit-filter').value);
+            const distanceFilter = parseFloat(document.getElementById('distance-filter').value);
+            
+            filteredData = carData.filter(car => {
+                const profit = parseInt(car.profit.replace(/[£,]/g, ''));
+                const distance = parseFloat(car.distance);
+                
+                const modelMatch = modelFilter === 'all' || car.model === modelFilter;
+                const profitMatch = profit >= profitFilter;
+                const distanceMatch = distance <= distanceFilter;
+                
+                return modelMatch && profitMatch && distanceMatch;
+            });
+            
+            updateStats();
+            renderTable();
+        }
+        
+        // Event listeners
+        document.getElementById('model-filter').addEventListener('change', applyFilters);
+        document.getElementById('profit-filter').addEventListener('change', applyFilters);
+        document.getElementById('distance-filter').addEventListener('change', applyFilters);
+        
+        // Initial render
+        populateFilters();
+        updateStats();
+        renderTable();
+    </script>
+</body>
+</html>

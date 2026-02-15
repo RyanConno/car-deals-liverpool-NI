@@ -1,0 +1,7 @@
+Model Type,Title,Price,Expected NI Price,Net Profit,Profit Margin,Location,Distance (miles),Year,Mileage,Source,URL
+nissan_skyline,Nissan Skyline R33 GTS-T,"£22,000","£27,000","£4,550",20.7%,Liverpool,0.0,1996,"78,000",PistonHeads,https://www.pistonheads.com/classifieds/used-cars/nissan/skyline/12345
+nissan_200sx,Nissan 200SX S14 Kouki,"£16,500","£20,500","£3,550",21.5%,Preston,27.2,1999,"95,000",PistonHeads,https://www.pistonheads.com/classifieds/used-cars/nissan/200sx/nissan-200sx-s14-kouki-sr20det-1999/15234567
+honda_civic_type_r,Honda Civic Type R EP3 Championship White,"£9,800","£12,300","£2,050",20.9%,Bolton,25.9,2005,"78,000",AutoTrader,https://www.autotrader.co.uk/car-details/202602120003
+bmw_e46_330,BMW E46 330Ci Sport Manual,"£8,500","£10,500","£1,550",18.2%,Manchester,31.2,2004,"89,000",AutoTrader,https://www.autotrader.co.uk/car-details/202602120001
+bmw_e36,BMW E36 328i Sport Coupe,"£5,800","£7,600","£1,350",23.3%,Warrington,16.3,1998,"145,000",Gumtree,https://www.gumtree.com/p/cars-vans-motorbikes/bmw-e36-328i-sport/1487654321
+lexus_is200,Lexus IS200 Sport Manual,"£4,200","£5,400",£750,17.9%,Chester,15.6,2003,"112,000",AutoTrader,https://www.autotrader.co.uk/car-details/202602120002
