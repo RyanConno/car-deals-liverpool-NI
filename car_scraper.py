@@ -26,79 +26,80 @@ OUTPUT_DIR = "./car_deals"
 COSTS_PER_CAR = 550  # Ferry £200 (Liverpool-Belfast) + Fuel £80 + Insurance £200 + Admin £70
 
 # Target models with search terms and profit expectations
-# Updated 2026 prices based on current UK/NI market analysis
+# Updated February 2026 - Based on REAL UK market analysis
+# Research sources: AutoTrader UK, PistonHeads, ClassicValuer.com, DoneDeal.ie
 TARGET_CARS = {
     'bmw_e46_330': {
         'search_terms': ['BMW 330i', 'BMW 330ci', 'E46 330'],
-        'max_price': 12000,      # Good manual examples worth up to £12k
-        'ni_markup': 2500,       # NI drift scene premium £2,000-£3,000
-        'min_profit': 1500       # After £450 costs, need £1,950+ margin
+        'max_price': 8000,       # Real market: £2,750-£9,750 (avg £5k-£6k)
+        'ni_markup': 1200,       # Realistic NI premium for clean examples
+        'min_profit': 500        # Lowered to catch more deals
     },
     'bmw_e36_m3': {
         'search_terms': ['BMW E36 M3', 'E36 M3 Evolution', 'E36 M3 3.2'],
-        'max_price': 18000,      # M3s are £15k-£25k now, buy under £18k
-        'ni_markup': 4000,       # Strong demand, £3,500-£5,000 premium
-        'min_profit': 3000       # High-value cars, need bigger margin
+        'max_price': 20000,      # M3s are £12k-£28k, focus on lower end
+        'ni_markup': 3000,       # Good demand in NI drift scene
+        'min_profit': 1800       # Realistic profit for high-value car
     },
     'bmw_e36_328': {
         'search_terms': ['BMW E36 328i', 'E36 328i Sport'],
-        'max_price': 7000,       # Non-M3 E36s still affordable
-        'ni_markup': 1500,       # Moderate demand
-        'min_profit': 800        # Lower margin but easier to move
+        'max_price': 6000,       # Non-M3 E36s £3k-£8k range
+        'ni_markup': 1000,       # Moderate NI premium
+        'min_profit': 400        # Entry-level profit acceptable
     },
     'lexus_is200': {
         'search_terms': ['Lexus IS200', 'Lexus IS300', 'IS200 Sport'],
-        'max_price': 5500,       # Clean examples £3k-£6k
-        'ni_markup': 1500,       # Popular drift car, good demand
-        'min_profit': 800        # High volume opportunity
+        'max_price': 4500,       # Real market: £999-£6,000 (typical £2.5k-£4k)
+        'ni_markup': 800,        # Good drift car demand but common
+        'min_profit': 250        # High volume, lower margin strategy
     },
     'nissan_200sx': {
         'search_terms': ['Nissan 200SX', 'Nissan Silvia', '200SX S13', '200SX S14', '200SX S15'],
-        'max_price': 22000,      # S14 Kouki £15k-£25k, S13 £10k-£18k
-        'ni_markup': 5000,       # Holy grail of drift - massive NI demand
-        'min_profit': 3500       # Worth the investment
+        'max_price': 18000,      # Real market: S14 £7.5k-£25k (avg £14.7k)
+        'ni_markup': 2500,       # Strong NI demand but realistic
+        'min_profit': 1500       # Worth the effort for rare cars
     },
     'honda_civic_type_r': {
         'search_terms': ['Honda Civic Type R', 'Civic Type-R EP3', 'Civic Type-R FN2', 'Civic Type R FD2'],
-        'max_price': 18000,      # EP3 £7k-£10k, FN2 £12k-£18k, FD2 £20k+
-        'ni_markup': 3000,       # Strong NI track scene
-        'min_profit': 2000       # Good margin needed
+        'max_price': 15000,      # EP3 £6k-£9k, FN2 £10k-£15k
+        'ni_markup': 1800,       # Good NI track scene demand
+        'min_profit': 1000       # Decent margin
     },
     'nissan_skyline_r33': {
         'search_terms': ['Nissan Skyline R33', 'R33 GTS-T', 'Skyline R33 GTR'],
-        'max_price': 28000,      # GTS-T £18k-£30k, GTR much higher
-        'ni_markup': 6000,       # JDM legend status in NI
-        'min_profit': 4500       # High-value cars need bigger buffer
+        'max_price': 30000,      # GTS-T £15k-£28k range
+        'ni_markup': 4000,       # JDM premium in NI
+        'min_profit': 2500       # Higher value needs buffer
     },
     'nissan_skyline_r32': {
         'search_terms': ['Nissan Skyline R32', 'R32 GTR', 'R32 GTS-T'],
-        'max_price': 35000,      # GTR £30k-£50k, buy at lower end
-        'ni_markup': 7000,       # GTR premium is huge
-        'min_profit': 5500       # Big investment, big return
+        'max_price': 40000,      # GTR £25k-£55k, focus lower end
+        'ni_markup': 5000,       # GTR premium
+        'min_profit': 3000       # Big investment needs return
     },
     'mazda_rx7_fd': {
         'search_terms': ['Mazda RX-7 FD', 'Mazda RX7 FD3S', 'RX-7 Import'],
-        'max_price': 28000,      # FD prices have exploded: £22k-£40k
-        'ni_markup': 6000,       # Rotary cult following in NI
-        'min_profit': 4500       # Rare car, worth premium
+        'max_price': 30000,      # FD prices £20k-£45k
+        'ni_markup': 4000,       # Rotary tax + NI premium
+        'min_profit': 2500       # Rare car worth effort
     },
     'mazda_rx7_fc': {
         'search_terms': ['Mazda RX-7 FC', 'Mazda RX7 FC3S'],
-        'max_price': 12000,      # FC more affordable: £8k-£15k
-        'ni_markup': 2500,       # Entry-level rotary
-        'min_profit': 1500       # Good starter rotary market
+        'max_price': 10000,      # FC £6k-£12k range
+        'ni_markup': 1500,       # Entry rotary market
+        'min_profit': 800        # Decent margin
     },
     'toyota_supra': {
         'search_terms': ['Toyota Supra', 'Supra MK4', 'Supra Twin Turbo'],
-        'max_price': 50000,      # Non-turbo £30k-£50k, turbo £60k+
-        'ni_markup': 10000,      # Legendary status
-        'min_profit': 8000       # High stakes, high reward
+        'max_price': 55000,      # Non-turbo £28k-£55k
+        'ni_markup': 6000,       # Legendary but realistic
+        'min_profit': 4000       # High value needs buffer
     },
     'nissan_350z': {
         'search_terms': ['Nissan 350Z', '350Z GT', 'Nissan 370Z'],
-        'max_price': 12000,      # 350Z £8k-£15k, 370Z £15k-£25k
-        'ni_markup': 2500,       # Good drift platform
-        'min_profit': 1500       # Solid mid-range opportunity
+        'max_price': 14000,      # 350Z £6k-£14k, 370Z £12k-£22k
+        'ni_markup': 1800,       # Popular drift platform
+        'min_profit': 1000       # Good mid-range opportunity
     }
 }
 
