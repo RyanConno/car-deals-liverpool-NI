@@ -33,73 +33,97 @@ TARGET_CARS = {
         'search_terms': ['BMW 330i', 'BMW 330ci', 'E46 330'],
         'max_price': 8000,       # Real market: £2,750-£9,750 (avg £5k-£6k)
         'ni_markup': 1200,       # Realistic NI premium for clean examples
-        'min_profit': 500        # Lowered to catch more deals
+        'min_profit': 500,       # Lowered to catch more deals
+        'avg_uk_price': 5500,    # Average England market price
+        'avg_ni_price': 6700     # Average NI market price
     },
     'bmw_e36_m3': {
         'search_terms': ['BMW E36 M3', 'E36 M3 Evolution', 'E36 M3 3.2'],
         'max_price': 20000,      # M3s are £12k-£28k, focus on lower end
         'ni_markup': 3000,       # Good demand in NI drift scene
-        'min_profit': 1800       # Realistic profit for high-value car
+        'min_profit': 1800,      # Realistic profit for high-value car
+        'avg_uk_price': 18000,   # Average England market price
+        'avg_ni_price': 21000    # Average NI market price
     },
     'bmw_e36_328': {
         'search_terms': ['BMW E36 328i', 'E36 328i Sport'],
         'max_price': 6000,       # Non-M3 E36s £3k-£8k range
         'ni_markup': 1000,       # Moderate NI premium
-        'min_profit': 400        # Entry-level profit acceptable
+        'min_profit': 400,       # Entry-level profit acceptable
+        'avg_uk_price': 4500,    # Average England market price
+        'avg_ni_price': 5500     # Average NI market price
     },
     'lexus_is200': {
         'search_terms': ['Lexus IS200', 'Lexus IS300', 'IS200 Sport'],
         'max_price': 4500,       # Real market: £999-£6,000 (typical £2.5k-£4k)
         'ni_markup': 800,        # Good drift car demand but common
-        'min_profit': 250        # High volume, lower margin strategy
+        'min_profit': 250,       # High volume, lower margin strategy
+        'avg_uk_price': 3200,    # Average England market price
+        'avg_ni_price': 4000     # Average NI market price
     },
     'nissan_200sx': {
         'search_terms': ['Nissan 200SX', 'Nissan Silvia', '200SX S13', '200SX S14', '200SX S15'],
         'max_price': 18000,      # Real market: S14 £7.5k-£25k (avg £14.7k)
         'ni_markup': 2500,       # Strong NI demand but realistic
-        'min_profit': 1500       # Worth the effort for rare cars
+        'min_profit': 1500,      # Worth the effort for rare cars
+        'avg_uk_price': 14700,   # Average England market price
+        'avg_ni_price': 17200    # Average NI market price
     },
     'honda_civic_type_r': {
         'search_terms': ['Honda Civic Type R', 'Civic Type-R EP3', 'Civic Type-R FN2', 'Civic Type R FD2'],
         'max_price': 15000,      # EP3 £6k-£9k, FN2 £10k-£15k
         'ni_markup': 1800,       # Good NI track scene demand
-        'min_profit': 1000       # Decent margin
+        'min_profit': 1000,      # Decent margin
+        'avg_uk_price': 11000,   # Average England market price
+        'avg_ni_price': 12800    # Average NI market price
     },
     'nissan_skyline_r33': {
         'search_terms': ['Nissan Skyline R33', 'R33 GTS-T', 'Skyline R33 GTR'],
         'max_price': 30000,      # GTS-T £15k-£28k range
         'ni_markup': 4000,       # JDM premium in NI
-        'min_profit': 2500       # Higher value needs buffer
+        'min_profit': 2500,      # Higher value needs buffer
+        'avg_uk_price': 22000,   # Average England market price
+        'avg_ni_price': 26000    # Average NI market price
     },
     'nissan_skyline_r32': {
         'search_terms': ['Nissan Skyline R32', 'R32 GTR', 'R32 GTS-T'],
         'max_price': 40000,      # GTR £25k-£55k, focus lower end
         'ni_markup': 5000,       # GTR premium
-        'min_profit': 3000       # Big investment needs return
+        'min_profit': 3000,      # Big investment needs return
+        'avg_uk_price': 35000,   # Average England market price
+        'avg_ni_price': 40000    # Average NI market price
     },
     'mazda_rx7_fd': {
         'search_terms': ['Mazda RX-7 FD', 'Mazda RX7 FD3S', 'RX-7 Import'],
         'max_price': 30000,      # FD prices £20k-£45k
         'ni_markup': 4000,       # Rotary tax + NI premium
-        'min_profit': 2500       # Rare car worth effort
+        'min_profit': 2500,      # Rare car worth effort
+        'avg_uk_price': 28000,   # Average England market price
+        'avg_ni_price': 32000    # Average NI market price
     },
     'mazda_rx7_fc': {
         'search_terms': ['Mazda RX-7 FC', 'Mazda RX7 FC3S'],
         'max_price': 10000,      # FC £6k-£12k range
         'ni_markup': 1500,       # Entry rotary market
-        'min_profit': 800        # Decent margin
+        'min_profit': 800,       # Decent margin
+        'avg_uk_price': 9000,    # Average England market price
+        'avg_ni_price': 10500    # Average NI market price
     },
     'toyota_supra': {
         'search_terms': ['Toyota Supra', 'Supra MK4', 'Supra Twin Turbo'],
         'max_price': 55000,      # Non-turbo £28k-£55k
         'ni_markup': 6000,       # Legendary but realistic
-        'min_profit': 4000       # High value needs buffer
+        'min_profit': 4000,      # High value needs buffer
+        'avg_uk_price': 42000,   # Average England market price
+        'avg_ni_price': 48000    # Average NI market price
     },
     'nissan_350z': {
         'search_terms': ['Nissan 350Z', '350Z GT', 'Nissan 370Z'],
         'max_price': 14000,      # 350Z £6k-£14k, 370Z £12k-£22k
         'ni_markup': 1800,       # Popular drift platform
-        'min_profit': 1000       # Good mid-range opportunity
+        'min_profit': 1000,      # Good mid-range opportunity
+        'avg_uk_price': 10000,   # Average England market price
+        'avg_ni_price': 11800    # Average NI market price
     }
 }
 
@@ -204,7 +228,7 @@ class CarListing:
         self.year = data.get('year', '')
         self.mileage = data.get('mileage', '')
         self.source = data.get('source', '')
-        
+
         # Calculate profit
         car_config = TARGET_CARS.get(self.model_type, {})
         self.ni_markup = car_config.get('ni_markup', 0)
@@ -212,7 +236,13 @@ class CarListing:
         self.gross_profit = self.ni_markup
         self.net_profit = self.ni_markup - COSTS_PER_CAR
         self.profit_margin = (self.net_profit / self.price * 100) if self.price > 0 else 0
-        
+
+        # Market comparison
+        self.avg_uk_price = car_config.get('avg_uk_price', 0)
+        self.avg_ni_price = car_config.get('avg_ni_price', 0)
+        self.uk_saving = self.avg_uk_price - self.price  # How much below UK average
+        self.ni_margin = self.avg_ni_price - self.expected_ni_price  # Room to sell below NI avg
+
         # Calculate distance
         self.distance = haversine_distance(LIVERPOOL_COORDS, self.coords)
     
@@ -232,8 +262,11 @@ class CarListing:
         return {
             'Model Type': self.model_type,
             'Title': self.title,
-            'Price': f'£{self.price:,}',
-            'Expected NI Price': f'£{self.expected_ni_price:,}',
+            'Buy Price': f'£{self.price:,}',
+            'Avg UK Price': f'£{self.avg_uk_price:,}',
+            'UK Saving': f'£{self.uk_saving:,}',
+            'Expected NI Sell': f'£{self.expected_ni_price:,}',
+            'Avg NI Price': f'£{self.avg_ni_price:,}',
             'Net Profit': f'£{self.net_profit:,}',
             'Profit Margin': f'{self.profit_margin:.1f}%',
             'Location': self.location,

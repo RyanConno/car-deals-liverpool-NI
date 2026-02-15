@@ -50,7 +50,10 @@ def run_scraper_background(use_demo=False):
                 'model_type': d.model_type,
                 'title': d.title,
                 'price': d.price,
+                'avg_uk_price': d.avg_uk_price,
+                'uk_saving': d.uk_saving,
                 'expected_ni_price': d.expected_ni_price,
+                'avg_ni_price': d.avg_ni_price,
                 'net_profit': d.net_profit,
                 'profit_margin': d.profit_margin,
                 'location': d.location,
@@ -431,12 +434,24 @@ def index():
                         <div class="deal-title">${deal.title}</div>
                         <div class="deal-info">
                             <div class="info-item">
-                                <span class="info-label">Buy Price</span>
+                                <span class="info-label">Buy Price (You Pay)</span>
                                 <span class="info-value">£${deal.price.toLocaleString()}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Avg UK Price</span>
+                                <span class="info-value" style="color: #888;">£${deal.avg_uk_price.toLocaleString()}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">UK Saving</span>
+                                <span class="info-value" style="color: ${deal.uk_saving > 0 ? '#00ff88' : '#ff4444'};">£${deal.uk_saving.toLocaleString()}</span>
                             </div>
                             <div class="info-item">
                                 <span class="info-label">Sell Price (NI)</span>
                                 <span class="info-value">£${deal.expected_ni_price.toLocaleString()}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Avg NI Price</span>
+                                <span class="info-value" style="color: #888;">£${deal.avg_ni_price.toLocaleString()}</span>
                             </div>
                             <div class="info-item">
                                 <span class="info-label">Net Profit</span>
@@ -547,7 +562,10 @@ if __name__ == '__main__':
             'model_type': d.model_type,
             'title': d.title,
             'price': d.price,
+            'avg_uk_price': d.avg_uk_price,
+            'uk_saving': d.uk_saving,
             'expected_ni_price': d.expected_ni_price,
+            'avg_ni_price': d.avg_ni_price,
             'net_profit': d.net_profit,
             'profit_margin': d.profit_margin,
             'location': d.location,
