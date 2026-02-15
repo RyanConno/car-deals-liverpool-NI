@@ -89,6 +89,35 @@ if sudo systemctl is-active --quiet car-arbitrage; then
     echo "=========================================="
     echo ""
 
+    # Configure Nginx
+    echo "🔧 Configuring Nginx..."
+
+    # Check if nginx is installed
+    if ! command -v nginx &> /dev/null; then
+        echo "📦 Installing nginx..."
+        sudo apt update
+        sudo apt install -y nginx
+    fi
+
+    # Copy nginx configuration
+    sudo cp "$SCRIPT_DIR/nginx-site.conf" /etc/nginx/sites-available/car-arbitrage
+
+    # Remove default site
+    sudo rm -f /etc/nginx/sites-enabled/default
+
+    # Enable car-arbitrage site
+    sudo ln -sf /etc/nginx/sites-available/car-arbitrage /etc/nginx/sites-enabled/
+
+    # Test and restart nginx
+    if sudo nginx -t 2>/dev/null; then
+        sudo systemctl restart nginx
+        echo "✅ Nginx configured successfully"
+    else
+        echo "⚠️  Nginx configuration warning (may still work)"
+    fi
+
+    echo ""
+
     # Get public IP (try multiple methods)
     PUBLIC_IP=$(curl -s ifconfig.me 2>/dev/null || curl -s icanhazip.com 2>/dev/null || hostname -I | awk '{print $1}')
 
