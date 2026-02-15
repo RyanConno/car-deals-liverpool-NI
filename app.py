@@ -178,6 +178,33 @@ def health():
     return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
 
 
+@app.route('/api/image-proxy')
+def image_proxy():
+    """Proxy external images to bypass referrer/hotlink restrictions"""
+    import requests as req
+    url = request.args.get('url', '')
+    if not url or not url.startswith('http'):
+        return '', 404
+
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+            'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+            'Referer': url.split('/')[0] + '//' + url.split('/')[2] + '/',
+        }
+        resp = req.get(url, headers=headers, timeout=10, stream=True)
+        if resp.status_code == 200:
+            content_type = resp.headers.get('Content-Type', 'image/jpeg')
+            response = make_response(resp.content)
+            response.headers['Content-Type'] = content_type
+            response.headers['Cache-Control'] = 'public, max-age=86400'
+            return response
+    except Exception:
+        pass
+
+    return '', 404
+
+
 @app.route('/api/version')
 def version():
     return jsonify({'version': 'v3-2026-02-15', 'started': app.config.get('START_TIME', 'unknown')})
@@ -327,7 +354,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg-
 /* Deal cards */
 .deal-card{background:var(--bg-card);margin:0 0 12px 0;border-radius:var(--radius);border:1px solid var(--border);transition:all .2s;overflow:hidden;display:flex}
 .deal-card:hover{border-color:var(--border-accent);background:var(--bg-card-hover);box-shadow:var(--shadow)}
-.deal-img{width:200px;min-height:140px;flex-shrink:0;background-size:cover;background-position:center;background-color:var(--bg-primary);background-repeat:no-repeat;position:relative}
+.deal-img{width:200px;min-height:140px;flex-shrink:0;background-color:var(--bg-primary);position:relative;overflow:hidden}
 .deal-img .no-img{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:.75em;text-transform:uppercase;letter-spacing:1px}
 .deal-body{flex:1;padding:20px;min-width:0}
 @media(max-width:700px){.deal-card{flex-direction:column}.deal-img{width:100%;height:180px}}
@@ -650,10 +677,18 @@ function filterDeals() {
     var html = '';
     for (var i = 0; i < filtered.length; i++) {
         var d = filtered[i];
-        var imgUrl = d.image || fallbackImages[d.model_type] || '';
+        var rawImgUrl = d.image || '';
+        var fallbackUrl = fallbackImages[d.model_type] || '';
+        // Use image proxy for external images (bypasses hotlink/referrer blocks)
+        var imgUrl = rawImgUrl ? '/api/image-proxy?url=' + encodeURIComponent(rawImgUrl) : fallbackUrl;
+        var fallbackSrc = fallbackUrl ? fallbackUrl : '';
         html += '<div class="deal-card">';
-        html += '<div class="deal-img" style="background-image:url(' + escAttr(imgUrl) + ')">';
-        if (!imgUrl) html += '<div class="no-img">No Image</div>';
+        html += '<div class="deal-img">';
+        if (imgUrl) {
+            html += '<img src="' + escAttr(imgUrl) + '" alt="' + escAttr(d.title) + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="this.onerror=null;if(this.src.indexOf(\'image-proxy\')>-1){this.src=\'' + escAttr(fallbackSrc).replace(/'/g, "\\'") + '\';}else{this.parentElement.innerHTML=\'<div class=no-img>No Image</div>\';}">';
+        } else {
+            html += '<div class="no-img">No Image</div>';
+        }
         html += '</div>';
         html += '<div class="deal-body">';
         html += '<div class="deal-header"><div class="deal-title">' + escHtml(d.title) + '</div>';

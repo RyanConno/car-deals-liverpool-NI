@@ -114,9 +114,9 @@ MODEL_IMAGES = {
     'bmw_f30_335d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/BMW_F30_320d_Sportline_Mineralgrau.jpg/640px-BMW_F30_320d_Sportline_Mineralgrau.jpg',
 }
 
-# Headers to mimic a real browser
+# Headers to mimic a real browser (Linux-compatible)
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
     'Accept-Language': 'en-GB,en;q=0.9',
     'Accept-Encoding': 'gzip, deflate, br',
@@ -303,7 +303,9 @@ class CarListing:
 
 
 class AutoTraderScraper:
-    """Scraper for AutoTrader UK - extracts embedded JSON data from Next.js pages"""
+    """Scraper for AutoTrader UK - tries multiple data extraction methods.
+    Note: AutoTrader uses a fully client-rendered React SPA which limits
+    what can be extracted with simple requests. Results may be limited."""
 
     BASE_URL = "https://www.autotrader.co.uk"
 
@@ -345,7 +347,15 @@ class AutoTraderScraper:
                     print(f"     ✓ Found {len(listings)} from embedded JSON")
                     return listings
 
-            # Method 2: Try to extract from inline JSON/script blocks
+            # Method 2: Try _next/data JSON API endpoint
+            build_id = self._extract_build_id(html)
+            if build_id:
+                listings = self._try_next_data_api(build_id, params, model_type)
+                if listings:
+                    print(f"     ✓ Found {len(listings)} from _next/data API")
+                    return listings
+
+            # Method 3: Try to extract from inline JSON/script blocks
             script_listings = self._extract_script_data(html)
             if script_listings:
                 listings = self._parse_script_listings(script_listings, model_type)
@@ -353,14 +363,19 @@ class AutoTraderScraper:
                     print(f"     ✓ Found {len(listings)} from script data")
                     return listings
 
-            # Method 3: Traditional HTML parsing with multiple selectors
+            # Method 4: Traditional HTML parsing with multiple selectors
             soup = BeautifulSoup(html, 'html.parser')
             listings = self._parse_html(soup, model_type, search_term)
             if listings:
                 print(f"     ✓ Found {len(listings)} from HTML parsing")
                 return listings
 
-            print(f"     - No results (page size: {len(html)} bytes)")
+            # AutoTrader is a client-rendered SPA - data loads via JavaScript
+            # Check for skeleton cards (empty placeholders that indicate SPA)
+            if 'skeleton-advertCard' in html or ('sauron' in html and len(listings) == 0):
+                print(f"     - SPA detected (client-rendered, no server-side data)")
+            else:
+                print(f"     - No results (page size: {len(html)} bytes)")
 
         except requests.RequestException as e:
             print(f"     ✗ Request failed: {str(e)[:80]}")
@@ -381,6 +396,73 @@ class AutoTraderScraper:
             'honda_civic_ep3_type_r': 'type r',
         }
         return keywords.get(model_type, '')
+
+    def _extract_build_id(self, html):
+        """Extract Next.js build ID for _next/data API"""
+        try:
+            # Try buildId in inline config
+            match = re.search(r'"buildId"\s*:\s*"([^"]+)"', html)
+            if match:
+                return match.group(1)
+            # Try from _buildManifest URL
+            match = re.search(r'/_next/static/([a-zA-Z0-9_-]+)/_buildManifest', html)
+            if match:
+                return match.group(1)
+        except Exception:
+            pass
+        return None
+
+    def _try_next_data_api(self, build_id, params, model_type):
+        """Try fetching data via Next.js _next/data JSON endpoint"""
+        listings = []
+        try:
+            data_url = f"{self.BASE_URL}/_next/data/{build_id}/car-search.json"
+            response = requests.get(data_url, params=params, headers=HEADERS, timeout=15)
+            if response.status_code == 200:
+                data = json.loads(response.text)
+                page_props = data.get('pageProps', {})
+                # Try to find listings in the response
+                search_results = (
+                    page_props.get('searchResults', {}).get('results', []) or
+                    page_props.get('listings', []) or
+                    page_props.get('results', []) or
+                    []
+                )
+                for item in search_results[:15]:
+                    try:
+                        title = item.get('title', '') or item.get('name', '')
+                        price = extract_price(str(item.get('price', '')))
+                        if price > 0:
+                            location = item.get('location', '') or item.get('sellerLocation', '')
+                            if isinstance(location, dict):
+                                location = location.get('town', '')
+                            url = item.get('url', '')
+                            if url and not url.startswith('http'):
+                                url = f"{self.BASE_URL}{url}"
+                            image = ''
+                            img_data = item.get('images', item.get('imageUrls', []))
+                            if isinstance(img_data, list) and img_data:
+                                first_img = img_data[0]
+                                image = first_img if isinstance(first_img, str) else first_img.get('url', '')
+                            if not image:
+                                image = item.get('imageUrl', item.get('image', ''))
+                            listings.append(CarListing({
+                                'model_type': model_type,
+                                'title': title or 'AutoTrader Listing',
+                                'price': price,
+                                'location': str(location) or 'Unknown',
+                                'coords': geocode_location(str(location)),
+                                'url': url,
+                                'year': str(item.get('year', 'Unknown')),
+                                'mileage': str(item.get('mileage', 'Unknown')),
+                                'source': 'AutoTrader',
+                                'image': image or ''
+                            }))
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+        return listings
 
     def _extract_next_data(self, html):
         """Extract __NEXT_DATA__ JSON from the page"""
@@ -702,9 +784,17 @@ class GumtreeScraper:
                         mileage_match = re.search(r'([\d,]+)\s*(miles|mi)', text, re.IGNORECASE)
 
                         image = ''
-                        img_el = el.find('img', src=True)
+                        img_el = el.find('img')
                         if img_el:
-                            image = img_el.get('src', '') or img_el.get('data-src', '')
+                            image = img_el.get('src', '') or img_el.get('data-src', '') or img_el.get('data-lazy-src', '')
+                            # Skip placeholder/tracking pixels
+                            if image and ('pixel' in image or 'spacer' in image or '1x1' in image or image.startswith('data:')):
+                                image = ''
+                            # Try srcset as fallback
+                            if not image:
+                                srcset = img_el.get('srcset', '')
+                                if srcset:
+                                    image = srcset.split(',')[0].strip().split(' ')[0]
 
                         listings.append(CarListing({
                             'model_type': model_type,
@@ -727,42 +817,52 @@ class GumtreeScraper:
 
 
 class PistonHeadsScraper:
-    """Scraper for PistonHeads classifieds"""
+    """Scraper for PistonHeads classifieds - browses /buy/{make} to get Apollo state adverts"""
 
     BASE_URL = "https://www.pistonheads.com"
 
+    # Map our make names to PistonHeads URL slugs
+    MAKE_SLUGS = {
+        'Peugeot': 'peugeot',
+        'Lexus': 'lexus',
+        'BMW': 'bmw',
+        'Honda': 'honda',
+    }
+
     def search(self, model_type: str, search_term: str) -> List[CarListing]:
-        """Search PistonHeads classifieds"""
+        """Search PistonHeads by browsing /buy/{make} and filtering Apollo state adverts"""
         listings = []
         config = TARGET_CARS[model_type]
 
         print(f"  → PistonHeads: {search_term}")
 
         try:
-            params = {
-                'q': search_term,
-                'price-max': str(config['max_price']),
-            }
+            make = config.get('make', '')
+            make_slug = self.MAKE_SLUGS.get(make, make.lower())
 
-            search_url = f"{self.BASE_URL}/classifieds?{urlencode(params)}"
-            response = requests.get(search_url, headers=HEADERS, timeout=20)
+            # Browse the make-specific page to get real adverts in Apollo state
+            search_url = f"{self.BASE_URL}/buy/{make_slug}"
+            response = requests.get(search_url, headers=HEADERS, timeout=20, allow_redirects=True)
             response.raise_for_status()
 
             html = response.text
 
-            # Method 1: Extract embedded JSON
-            json_data = self._extract_json_data(html)
-            if json_data:
-                listings = self._parse_json_listings(json_data, model_type)
+            # Method 1: Extract Apollo state from __NEXT_DATA__
+            apollo_state = self._extract_apollo_state(html)
+            if apollo_state:
+                listings = self._parse_apollo_adverts(apollo_state, model_type, config)
                 if listings:
-                    print(f"     ✓ Found {len(listings)} from JSON")
+                    print(f"     ✓ Found {len(listings)} from Apollo state")
                     return listings
 
-            # Method 2: Parse HTML
+            # Method 2: Parse server-rendered MUI Card HTML
             soup = BeautifulSoup(html, 'html.parser')
-            listings = self._parse_html(soup, model_type, search_term)
+            listings = self._parse_mui_cards(soup, model_type, search_term, config)
+            if listings:
+                print(f"     ✓ Found {len(listings)} from HTML")
+                return listings
 
-            print(f"     {'✓ Found ' + str(len(listings)) if listings else '- No results'} (page: {len(html)} bytes)")
+            print(f"     - No matching results (page: {len(html)} bytes)")
 
         except requests.RequestException as e:
             print(f"     ✗ Request failed: {str(e)[:80]}")
@@ -771,124 +871,203 @@ class PistonHeadsScraper:
 
         return listings
 
-    def _extract_json_data(self, html):
-        """Extract embedded JSON data from PistonHeads"""
-        patterns = [
-            r'<script\s+id="__NEXT_DATA__"\s+type="application/json">(.*?)</script>',
-            r'window\.__PRELOADED_STATE__\s*=\s*({.*?});\s*</script>',
-            r'"listings"\s*:\s*(\[{.*?}\])',
-        ]
-        for pattern in patterns:
-            match = re.search(pattern, html, re.DOTALL)
+    def _extract_apollo_state(self, html):
+        """Extract Apollo state containing Advert entries from __NEXT_DATA__"""
+        try:
+            match = re.search(r'<script\s+id="__NEXT_DATA__"\s+type="application/json">(.*?)</script>', html, re.DOTALL)
             if match:
-                try:
-                    return json.loads(match.group(1))
-                except json.JSONDecodeError:
-                    continue
+                data = json.loads(match.group(1))
+                apollo = data.get('props', {}).get('pageProps', {}).get('__APOLLO_STATE__', {})
+                if apollo:
+                    return apollo
+        except (json.JSONDecodeError, AttributeError):
+            pass
         return None
 
-    def _parse_json_listings(self, data, model_type):
-        """Parse listings from PistonHeads JSON"""
+    def _parse_apollo_adverts(self, apollo_state, model_type, config):
+        """Parse listings from PistonHeads Apollo state (Advert:XXXXX entries).
+        Filters adverts by model name and price range since Apollo state
+        contains all featured adverts for the make, not just our target model."""
         listings = []
 
-        # Navigate Next.js structure
-        if isinstance(data, dict):
-            props = data.get('props', {}).get('pageProps', {})
-            items = (
-                props.get('listings', []) or
-                props.get('results', []) or
-                props.get('adverts', []) or
-                []
-            )
-        else:
-            items = data if isinstance(data, list) else []
+        # Build model matching keywords
+        model_name = config.get('model', '').lower()
+        # Additional keywords to match the right model
+        model_keywords = {
+            'peugeot_306_dturbo': ['306'],
+            'lexus_is200': ['is200', 'is 200', 'is-200'],
+            'bmw_e46_330': ['330i', '330ci', '330'],
+            'honda_civic_ep3_type_r': ['civic', 'type r', 'type-r'],
+            'bmw_e60_530d': ['530d', '530'],
+            'bmw_e60_535d': ['535d', '535'],
+            'bmw_f30_330d': ['330d'],
+            'bmw_f30_335d': ['335d'],
+        }
+        keywords = model_keywords.get(model_type, [model_name])
+        max_price = config.get('max_price', 999999)
 
-        for item in items[:15]:
+        for key, item in apollo_state.items():
+            if not key.startswith('Advert:') and not key.startswith('FeaturedAdvert:'):
+                continue
+
             try:
-                price = extract_price(str(item.get('price', 0)))
-                if price > 0:
-                    location = item.get('location', 'Unknown')
-                    if isinstance(location, dict):
-                        location = location.get('town', location.get('area', 'Unknown'))
-                    url = item.get('url', '')
-                    if url and not url.startswith('http'):
-                        url = f"{self.BASE_URL}{url}"
-                    image = item.get('imageUrl', item.get('image', item.get('thumbnailUrl', '')))
-                    img_list = item.get('images', item.get('imageUrls', []))
-                    if not image and isinstance(img_list, list) and img_list:
-                        first = img_list[0]
-                        image = first if isinstance(first, str) else first.get('url', first.get('src', ''))
-                    listings.append(CarListing({
-                        'model_type': model_type,
-                        'title': item.get('title', 'PistonHeads Listing'),
-                        'price': price,
-                        'location': str(location),
-                        'coords': geocode_location(str(location)),
-                        'url': url,
-                        'year': str(item.get('year', 'Unknown')),
-                        'mileage': str(item.get('mileage', 'Unknown')),
-                        'source': 'PistonHeads',
-                        'image': image or ''
-                    }))
+                price = int(item.get('price', 0))
+                if price <= 0 or price > max_price:
+                    continue
+
+                headline = item.get('headline', 'PistonHeads Listing')
+                headline_lower = headline.lower()
+
+                # Check if this advert matches our target model
+                model_analytics = (item.get('modelAnalyticsName', '') or '').lower()
+                combined_text = f"{headline_lower} {model_analytics}"
+
+                if not any(kw in combined_text for kw in keywords):
+                    continue
+
+                year = str(item.get('year', 'Unknown'))
+                advert_id = item.get('id', '')
+
+                # Extract image from fullSizeImageUrls
+                image = ''
+                img_urls = item.get('fullSizeImageUrls', [])
+                if isinstance(img_urls, list) and img_urls:
+                    image = img_urls[0] if isinstance(img_urls[0], str) else ''
+
+                # Extract mileage from specificationData
+                spec = item.get('specificationData', {})
+                mileage = 'Unknown'
+                if isinstance(spec, dict):
+                    mileage = str(spec.get('mileage', 'Unknown'))
+
+                # Try to get seller location
+                location = 'Unknown'
+                seller_ref = item.get('seller', {})
+                if isinstance(seller_ref, dict):
+                    seller_key = seller_ref.get('__ref', '')
+                    if seller_key and seller_key in apollo_state:
+                        seller = apollo_state[seller_key]
+                        location = seller.get('location', seller.get('town', 'Unknown'))
+                        if isinstance(location, dict):
+                            location = location.get('town', location.get('name', 'Unknown'))
+
+                url = f"{self.BASE_URL}/buy/listing/{advert_id}" if advert_id else ''
+
+                listings.append(CarListing({
+                    'model_type': model_type,
+                    'title': headline,
+                    'price': price,
+                    'location': str(location),
+                    'coords': geocode_location(str(location)),
+                    'url': url,
+                    'year': year,
+                    'mileage': mileage,
+                    'source': 'PistonHeads',
+                    'image': image
+                }))
             except Exception:
                 continue
+
         return listings
 
-    def _parse_html(self, soup, model_type, search_term):
-        """Parse PistonHeads HTML"""
+    def _parse_mui_cards(self, soup, model_type, search_term, config):
+        """Parse PistonHeads server-rendered MUI Card components.
+        Filters cards by model-specific keywords since the page shows all make's listings."""
         listings = []
 
-        selectors = [
-            ('article', {'class': re.compile(r'listing')}),
-            ('div', {'class': re.compile(r'ad-listing|search-result')}),
-            ('li', {'class': re.compile(r'listing')}),
-        ]
+        # Build model matching keywords (same as Apollo parser)
+        model_keywords = {
+            'peugeot_306_dturbo': ['306'],
+            'lexus_is200': ['is200', 'is 200', 'is-200'],
+            'bmw_e46_330': ['330i', '330ci', '330 ', 'e46'],
+            'honda_civic_ep3_type_r': ['civic', 'type r', 'type-r'],
+            'bmw_e60_530d': ['530d', '530 '],
+            'bmw_e60_535d': ['535d', '535 '],
+            'bmw_f30_330d': ['330d'],
+            'bmw_f30_335d': ['335d'],
+        }
+        keywords = model_keywords.get(model_type, [config.get('model', '').lower()])
+        max_price = config.get('max_price', 999999)
 
-        for tag, attrs in selectors:
-            elements = soup.find_all(tag, attrs)
-            if elements:
-                for el in elements[:15]:
-                    try:
-                        title_el = el.find(['h2', 'h3', 'a'])
-                        title = title_el.get_text(strip=True) if title_el else search_term
+        # PistonHeads uses Material-UI cards - find only top-level cards
+        cards = soup.find_all('div', class_=re.compile(r'CardOfSearchResult_card__'))
+        if not cards:
+            cards = soup.find_all('div', class_=re.compile(r'MuiCard-root'))
 
-                        price_text = el.find(string=re.compile(r'£[\d,]+'))
-                        price = extract_price(price_text) if price_text else 0
-                        if price == 0:
-                            continue
+        seen = set()  # Deduplicate
 
-                        link = el.find('a', href=True)
-                        url = ''
-                        if link:
-                            url = link['href']
-                            if not url.startswith('http'):
-                                url = f"{self.BASE_URL}{url}"
+        for card in cards[:40]:
+            try:
+                text = card.get_text(separator=' ')
+                text_lower = text.lower()
 
-                        text = el.get_text()
-                        year_match = re.search(r'(19|20)\d{2}', text)
-                        mileage_match = re.search(r'([\d,]+)\s*miles', text, re.IGNORECASE)
+                # Extract price
+                price_match = re.search(r'£([\d,]+)', text)
+                if not price_match:
+                    continue
+                price = extract_price(price_match.group())
+                if price <= 0 or price > max_price:
+                    continue
 
-                        image = ''
-                        img_el = el.find('img', src=True)
-                        if img_el:
-                            image = img_el.get('src', '') or img_el.get('data-src', '')
+                # Filter: must match target model keywords
+                if not any(kw in text_lower for kw in keywords):
+                    continue
 
-                        listings.append(CarListing({
-                            'model_type': model_type,
-                            'title': title,
-                            'price': price,
-                            'location': 'Unknown',
-                            'coords': LIVERPOOL_COORDS,
-                            'url': url,
-                            'year': year_match.group() if year_match else 'Unknown',
-                            'mileage': mileage_match.group(1) if mileage_match else 'Unknown',
-                            'source': 'PistonHeads',
-                            'image': image
-                        }))
-                    except Exception:
-                        continue
-                if listings:
-                    break
+                # Deduplicate by price + first chars of text
+                card_key = f"{price}_{text_lower[:80]}"
+                if card_key in seen:
+                    continue
+                seen.add(card_key)
+
+                # Extract title from the card text
+                # PistonHeads format: "Sponsored £XX,XXX Title 2022 BodyType NNN miles"
+                # Remove price, then take text before year/body type
+                clean_text = re.sub(r'(?:Navigate\s+\w+|Sponsored|Featured)\s*', '', text).strip()
+                clean_text = re.sub(r'£[\d,]+\s*', '', clean_text).strip()
+                # Take first substantial chunk as title
+                title_match = re.match(r'(.{10,80}?)(?:\d{4}\s*[A-Z])', clean_text)
+                title = title_match.group(1).strip() if title_match else clean_text[:80].strip()
+                if not title or len(title) < 5:
+                    title = search_term
+
+                # Extract year
+                year_match = re.search(r'(19|20)\d{2}', text)
+                year = year_match.group() if year_match else 'Unknown'
+
+                # Extract mileage
+                mileage_match = re.search(r'([\d,]+)\s*mil', text, re.IGNORECASE)
+                mileage = mileage_match.group(1) if mileage_match else 'Unknown'
+
+                # Extract link
+                url = ''
+                link = card.find('a', href=True)
+                if link:
+                    url = link['href']
+                    if not url.startswith('http'):
+                        url = f"{self.BASE_URL}{url}"
+
+                # Extract image (skip SVG placeholders)
+                image = ''
+                img_el = card.find('img')
+                if img_el:
+                    src = img_el.get('src', '') or img_el.get('data-src', '')
+                    if src and not src.startswith('data:'):
+                        image = src
+
+                listings.append(CarListing({
+                    'model_type': model_type,
+                    'title': title,
+                    'price': price,
+                    'location': 'Unknown',
+                    'coords': LIVERPOOL_COORDS,
+                    'url': url,
+                    'year': year,
+                    'mileage': mileage,
+                    'source': 'PistonHeads',
+                    'image': image
+                }))
+            except Exception:
+                continue
 
         return listings
 
@@ -918,8 +1097,6 @@ class CarArbitrageFinder:
         print("  CAR ARBITRAGE FINDER - Liverpool → Northern Ireland")
         print("="*60 + "\n")
 
-        # Only search with the FIRST search term per model (not all 4)
-        # This reduces 96 searches to 24, much faster
         total_searches = len(TARGET_CARS) * len(self.scrapers)
         completed = 0
 
@@ -929,7 +1106,6 @@ class CarArbitrageFinder:
             model_name = model_type.replace('_', ' ').title()
             self._log(f"🔍 Searching for {model_name} (max £{config['max_price']:,})")
 
-            # Use primary search term only (the structured URL params handle the rest)
             search_term = config['search_terms'][0]
 
             for scraper in self.scrapers:
@@ -939,6 +1115,21 @@ class CarArbitrageFinder:
                     self._log(f"📡 {scraper_name}: Searching '{search_term}'...")
 
                     listings = scraper.search(model_type, search_term)
+
+                    # For Gumtree (our most reliable source), try a 2nd search term
+                    # if the first returned few results, to maximize coverage
+                    if isinstance(scraper, GumtreeScraper) and len(listings) < 5 and len(config['search_terms']) > 1:
+                        time.sleep(random.uniform(1.0, 2.0))
+                        alt_term = config['search_terms'][1]
+                        self._log(f"📡 {scraper_name}: Trying alternate term '{alt_term}'...")
+                        alt_listings = scraper.search(model_type, alt_term)
+                        # Add only new listings (avoid dups by URL)
+                        existing_urls = {l.url for l in listings if l.url}
+                        for l in alt_listings:
+                            if not l.url or l.url not in existing_urls:
+                                listings.append(l)
+                                existing_urls.add(l.url)
+
                     self.all_listings.extend(listings)
 
                     profitable = [l for l in listings if l.is_profitable()]
