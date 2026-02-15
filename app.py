@@ -4,7 +4,7 @@ Flask Web Application for Car Arbitrage Scraper
 Provides REST API and web interface for car deals
 """
 
-from flask import Flask, jsonify, render_template_string, send_file, request
+from flask import Flask, jsonify, request, make_response
 from flask_cors import CORS
 import os
 import json
@@ -12,7 +12,6 @@ from datetime import datetime
 import threading
 from pathlib import Path
 
-# Import the scraper
 from car_scraper import CarArbitrageFinder, create_sample_data, OUTPUT_DIR, TARGET_CARS
 
 app = Flask(__name__)
@@ -21,142 +20,111 @@ CORS(app)
 
 @app.after_request
 def add_no_cache_headers(response):
-    """Prevent browser and proxy caching so code updates show immediately"""
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
     return response
 
+
 # Global state
 scraper_status = {
     'running': False,
     'last_run': None,
-    'last_result': None,
     'error': None,
     'progress': 0,
     'current_action': '',
-    'total_searches': 0,
-    'completed_searches': 0,
     'action_log': []
 }
 
 latest_deals = []
-current_finder = None  # Reference to active scraper instance
 
 
 def log_action(message):
-    """Log a scraping action to the status"""
-    global scraper_status
     import re
-
     scraper_status['current_action'] = message
     scraper_status['action_log'].append({
         'time': datetime.now().strftime('%H:%M:%S'),
         'message': message
     })
-
-    # Extract progress percentage from message if present
     progress_match = re.search(r'(\d+)%\s+complete', message)
     if progress_match:
         scraper_status['progress'] = int(progress_match.group(1))
-
-    # Keep only last 20 log entries
-    if len(scraper_status['action_log']) > 20:
-        scraper_status['action_log'] = scraper_status['action_log'][-20:]
+    if len(scraper_status['action_log']) > 30:
+        scraper_status['action_log'] = scraper_status['action_log'][-30:]
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
 
 
-def update_deals_from_finder(finder):
-    """Convert finder's deals to API format"""
-    global latest_deals
-    latest_deals = [
-        {
-            'model_type': d.model_type,
-            'title': d.title,
-            'price': d.price,
-            'avg_uk_price': d.avg_uk_price,
-            'uk_saving': d.uk_saving,
-            'expected_ni_price': d.expected_ni_price,
-            'avg_ni_price': d.avg_ni_price,
-            'net_profit': d.net_profit,
-            'profit_margin': d.profit_margin,
-            'location': d.location,
-            'distance': round(d.distance, 1),
-            'year': d.year,
-            'mileage': d.mileage,
-            'source': d.source,
-            'url': d.url
-        }
-        for d in sorted(finder.profitable_deals, key=lambda x: x.net_profit, reverse=True)
-    ]
+def deal_to_dict(d):
+    return {
+        'model_type': d.model_type,
+        'title': d.title,
+        'price': d.price,
+        'avg_uk_price': d.avg_uk_price,
+        'uk_saving': d.uk_saving,
+        'expected_ni_price': d.expected_ni_price,
+        'avg_ni_price': d.avg_ni_price,
+        'net_profit': d.net_profit,
+        'profit_margin': d.profit_margin,
+        'location': d.location,
+        'distance': round(d.distance, 1),
+        'year': d.year,
+        'mileage': d.mileage,
+        'source': d.source,
+        'url': d.url
+    }
 
 
 def run_scraper_background(use_demo=False):
-    """Run the scraper in background"""
-    global scraper_status, latest_deals, current_finder
+    global scraper_status, latest_deals
 
     try:
         scraper_status['running'] = True
         scraper_status['error'] = None
         scraper_status['progress'] = 0
-        scraper_status['current_action'] = 'Initializing scraper...'
+        scraper_status['current_action'] = 'Initializing...'
         scraper_status['action_log'] = []
-        latest_deals = []  # Clear existing deals immediately
+        latest_deals = []
 
-        log_action("🚀 Initializing Car Arbitrage Scraper...")
+        log_action("Starting Car Arbitrage Scraper...")
 
-        # Create finder with progress callback
         finder = CarArbitrageFinder(progress_callback=log_action)
-        current_finder = finder  # Make finder accessible globally
 
         if use_demo:
-            log_action("🎬 Running in DEMO mode with sample data")
+            log_action("Running in DEMO mode with sample data")
             finder.profitable_deals = [d for d in create_sample_data() if d.is_profitable()]
-            update_deals_from_finder(finder)
-            log_action(f"✅ Demo complete - {len(finder.profitable_deals)} sample deals loaded")
+            latest_deals = [deal_to_dict(d) for d in sorted(finder.profitable_deals, key=lambda x: x.net_profit, reverse=True)]
+            scraper_status['progress'] = 100
+            log_action("Demo complete - {} deals loaded".format(len(latest_deals)))
         else:
-            # Calculate total searches
-            total_searches = sum(len(config['search_terms']) * 3 for config in TARGET_CARS.values())
-            scraper_status['total_searches'] = total_searches
-            scraper_status['completed_searches'] = 0
-
-            # Start a monitor thread to update deals in real-time
-            def monitor_deals():
+            def monitor():
                 while scraper_status['running']:
                     if finder.profitable_deals:
-                        update_deals_from_finder(finder)
-                    threading.Event().wait(2)  # Update every 2 seconds
+                        try:
+                            latest_deals[:] = [deal_to_dict(d) for d in sorted(finder.profitable_deals, key=lambda x: x.net_profit, reverse=True)]
+                        except Exception:
+                            pass
+                    threading.Event().wait(2)
 
-            monitor_thread = threading.Thread(target=monitor_deals, daemon=True)
-            monitor_thread.start()
+            t = threading.Thread(target=monitor, daemon=True)
+            t.start()
 
-            log_action(f"📊 Searching {len(TARGET_CARS)} car models across 3 websites")
             finder.search_all()
-            update_deals_from_finder(finder)  # Final update
-            log_action(f"✅ Scraping complete - {len(finder.profitable_deals)} deals found")
 
-        # Store results (keep existing code)
-        update_deals_from_finder(finder)
-        scraper_status['progress'] = 100
+            latest_deals[:] = [deal_to_dict(d) for d in sorted(finder.profitable_deals, key=lambda x: x.net_profit, reverse=True)]
+            scraper_status['progress'] = 100
+            log_action("Scraping complete - {} deals found".format(len(latest_deals)))
 
-        # Export files
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        csv_file = f"{OUTPUT_DIR}/deals_{timestamp}.csv"
-        html_file = f"{OUTPUT_DIR}/deals_{timestamp}.html"
-
-        finder.export_csv(csv_file)
-        finder.export_html(html_file)
+        if finder.profitable_deals:
+            finder.export_csv(f"{OUTPUT_DIR}/deals_{timestamp}.csv")
+            finder.export_html(f"{OUTPUT_DIR}/deals_{timestamp}.html")
 
         scraper_status['last_run'] = datetime.now().isoformat()
-        scraper_status['last_result'] = {
-            'total_deals': len(latest_deals),
-            'total_profit': sum(d['net_profit'] for d in latest_deals),
-            'csv_file': csv_file,
-            'html_file': html_file
-        }
 
     except Exception as e:
         scraper_status['error'] = str(e)
+        log_action("ERROR: " + str(e))
         print(f"Scraper error: {e}")
     finally:
         scraper_status['running'] = False
@@ -164,646 +132,26 @@ def run_scraper_background(use_demo=False):
 
 @app.route('/')
 def index():
-    """Main dashboard - shows live car deals"""
-    html = '''
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Car Arbitrage - Liverpool to NI</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
-            color: #e0e0e0;
-            padding: 20px;
-            min-height: 100vh;
-        }
-        .container { max-width: 1600px; margin: 0 auto; }
-        header {
-            text-align: center;
-            margin-bottom: 40px;
-            padding: 40px 20px;
-            background: rgba(26, 31, 58, 0.6);
-            border-radius: 16px;
-            border: 1px solid #00ff8833;
-        }
-        h1 {
-            color: #00ff88;
-            font-size: 3em;
-            margin-bottom: 15px;
-            text-shadow: 0 0 30px rgba(0,255,136,0.6);
-        }
-        .subtitle { color: #888; font-size: 1.2em; margin-bottom: 20px; }
-        .controls {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-top: 25px;
-        }
-        button, .btn-link {
-            background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
-            color: #0a0e27;
-            border: none;
-            padding: 14px 28px;
-            border-radius: 8px;
-            font-size: 1em;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            text-decoration: none;
-            display: inline-block;
-        }
-        button:hover, .btn-link:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(0,255,136,0.4);
-        }
-        button:disabled {
-            background: #555;
-            color: #888;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .btn-secondary {
-            background: linear-gradient(135deg, #6666ff 0%, #4444dd 100%);
-            color: white;
-        }
-        .btn-search {
-            background: linear-gradient(135deg, #ffaa00 0%, #ff8800 100%);
-            color: white;
-        }
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin: 30px 0;
-        }
-        .stat-card {
-            background: linear-gradient(135deg, #1a1f3a 0%, #2a2f4a 100%);
-            padding: 25px;
-            border-radius: 12px;
-            border: 1px solid #00ff8833;
-            text-align: center;
-        }
-        .stat-value {
-            font-size: 2.5em;
-            color: #00ff88;
-            font-weight: bold;
-            margin-bottom: 8px;
-        }
-        .stat-label {
-            color: #888;
-            text-transform: uppercase;
-            font-size: 0.85em;
-            letter-spacing: 1px;
-        }
-        .status {
-            text-align: center;
-            padding: 20px;
-            margin: 20px 0;
-            border-radius: 8px;
-            font-size: 1.1em;
-        }
-        .status.running {
-            background: rgba(255,170,0,0.2);
-            color: #ffaa00;
-            border: 1px solid #ffaa00;
-        }
-        .status.success {
-            background: rgba(0,255,136,0.2);
-            color: #00ff88;
-            border: 1px solid #00ff88;
-        }
-        .status.error {
-            background: rgba(255,68,68,0.2);
-            color: #ff4444;
-            border: 1px solid #ff4444;
-        }
-        .deals-container {
-            background: #1a1f3a;
-            border-radius: 16px;
-            padding: 30px;
-            margin: 30px 0;
-            border: 1px solid #00ff8833;
-        }
-        .deal-card {
-            background: #2a2f4a;
-            padding: 20px;
-            margin: 15px 0;
-            border-radius: 10px;
-            border-left: 4px solid #00ff88;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .deal-card:hover {
-            transform: translateX(5px);
-            box-shadow: 0 4px 20px rgba(0,255,136,0.3);
-        }
-        .deal-title {
-            font-size: 1.3em;
-            color: #fff;
-            font-weight: 600;
-            margin-bottom: 12px;
-        }
-        .deal-info {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 12px;
-            margin: 15px 0;
-        }
-        .info-item {
-            display: flex;
-            flex-direction: column;
-        }
-        .info-label {
-            color: #888;
-            font-size: 0.8em;
-            text-transform: uppercase;
-            margin-bottom: 4px;
-        }
-        .info-value {
-            color: #fff;
-            font-size: 1.1em;
-            font-weight: 600;
-        }
-        .profit-highlight {
-            color: #00ff88;
-            font-size: 1.4em;
-        }
-        .link-btn {
-            display: inline-block;
-            margin-top: 12px;
-            padding: 10px 20px;
-            background: linear-gradient(135deg, #6666ff 0%, #4444dd 100%);
-            color: white;
-            text-decoration: none;
-            border-radius: 6px;
-            font-weight: 600;
-            transition: all 0.2s;
-        }
-        .link-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(102,102,255,0.4);
-        }
-        .api-docs {
-            background: #1a1f3a;
-            padding: 25px;
-            border-radius: 12px;
-            margin: 30px 0;
-            border: 1px solid #6666ff33;
-        }
-        .api-docs h2 {
-            color: #6666ff;
-            margin-bottom: 15px;
-        }
-        .api-endpoint {
-            background: #2a2f4a;
-            padding: 12px 15px;
-            margin: 10px 0;
-            border-radius: 6px;
-            font-family: 'Courier New', monospace;
-            color: #00ff88;
-            border-left: 3px solid #6666ff;
-        }
-        .loading {
-            text-align: center;
-            padding: 40px;
-            font-size: 1.2em;
-            color: #888;
-        }
-        .spinner {
-            border: 4px solid #2a2f4a;
-            border-top: 4px solid #00ff88;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .progress-container {
-            background: #1a1f3a;
-            border-radius: 12px;
-            padding: 20px;
-            margin: 20px 0;
-            border: 1px solid #6666ff33;
-            display: none;
-        }
-        .progress-container.active {
-            display: block;
-        }
-        .progress-bar {
-            background: #2a2f4a;
-            height: 30px;
-            border-radius: 15px;
-            overflow: hidden;
-            margin: 15px 0;
-            border: 1px solid #6666ff33;
-        }
-        .progress-fill {
-            background: linear-gradient(90deg, #00ff88 0%, #00cc6a 100%);
-            height: 100%;
-            width: 0%;
-            transition: width 0.5s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #0a0e27;
-            font-weight: bold;
-            font-size: 0.9em;
-        }
-        .current-action {
-            color: #00ff88;
-            font-size: 1.1em;
-            margin: 10px 0;
-            padding: 10px;
-            background: #2a2f4a;
-            border-radius: 8px;
-            border-left: 4px solid #00ff88;
-        }
-        .action-log {
-            max-height: 200px;
-            overflow-y: auto;
-            margin-top: 15px;
-            background: #0f1329;
-            border-radius: 8px;
-            padding: 10px;
-        }
-        .action-log-item {
-            padding: 5px 10px;
-            margin: 3px 0;
-            font-size: 0.9em;
-            color: #888;
-            border-left: 2px solid #444;
-        }
-        .action-log-item .time {
-            color: #6666ff;
-            margin-right: 8px;
-            font-family: 'Courier New', monospace;
-        }
-        .action-log::-webkit-scrollbar {
-            width: 8px;
-        }
-        .action-log::-webkit-scrollbar-track {
-            background: #1a1f3a;
-            border-radius: 4px;
-        }
-        .action-log::-webkit-scrollbar-thumb {
-            background: #6666ff;
-            border-radius: 4px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>🏎️ Car Arbitrage Dashboard</h1>
-            <p class="subtitle">Liverpool → Northern Ireland | Live Drift & Race Car Deals</p>
-            <div class="controls">
-                <a href="/search-links" class="btn-link btn-search">🔗 Manual Search Links</a>
-                <button onclick="runScraper(false)" id="scrape-btn">🔍 Scrape Live Data</button>
-                <button onclick="runScraper(true)" class="btn-secondary">🎬 Demo Mode</button>
-                <button onclick="loadDeals()" class="btn-secondary">🔄 Refresh</button>
-            </div>
-        </header>
-
-        <div id="status"></div>
-
-        <!-- Progress Tracker -->
-        <div id="progress-container" class="progress-container">
-            <h3 style="color: #6666ff; margin-bottom: 10px;">🔄 Scraping Progress</h3>
-            <div class="progress-bar">
-                <div id="progress-fill" class="progress-fill">0%</div>
-            </div>
-            <div id="current-action" class="current-action">Initializing...</div>
-            <details open>
-                <summary style="color: #888; cursor: pointer; margin-top: 15px;">📋 Action Log</summary>
-                <div id="action-log" class="action-log"></div>
-            </details>
-        </div>
-
-        <div class="stats" id="stats" style="display:none;">
-            <div class="stat-card">
-                <div class="stat-value" id="total-deals">0</div>
-                <div class="stat-label">Total Deals</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="total-profit">£0</div>
-                <div class="stat-label">Total Profit</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="avg-profit">£0</div>
-                <div class="stat-label">Avg Profit/Car</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="best-margin">0%</div>
-                <div class="stat-label">Best Margin</div>
-            </div>
-        </div>
-
-        <div class="deals-container">
-            <h2 style="color: #00ff88; margin-bottom: 20px;">💰 Profitable Deals</h2>
-            <div id="deals-list"></div>
-        </div>
-
-        <div class="api-docs">
-            <h2>📡 Quick Links</h2>
-            <p style="color: #888; margin-bottom: 15px;">Direct access to tools and searches:</p>
-            <div class="api-endpoint"><a href="/search-links" style="color: #00ff88; text-decoration: none;">🔗 Quick Search Links - Browse cars on AutoTrader, Gumtree, PistonHeads</a></div>
-            <div class="api-endpoint">GET /api/deals - Get all current deals (JSON)</div>
-            <div class="api-endpoint">GET /api/status - Get scraper status</div>
-            <div class="api-endpoint">POST /api/scrape?demo=true - Run scraper</div>
-            <div class="api-endpoint">GET /api/models - Get target car models</div>
-        </div>
-    </div>
-
-    <script>
-        let statusCheckInterval;
-        let dealsPollingInterval;
-
-        async function runScraper(demo) {
-            console.log('runScraper called, demo:', demo);
-
-            const btn = document.getElementById('scrape-btn');
-            btn.disabled = true;
-
-            // Show progress container FIRST
-            const progressContainer = document.getElementById('progress-container');
-            if (progressContainer) {
-                console.log('Showing progress container');
-                progressContainer.classList.add('active');
-                progressContainer.style.display = 'block';  // Force display
-                document.getElementById('progress-fill').style.width = '0%';
-                document.getElementById('progress-fill').textContent = '0%';
-                document.getElementById('current-action').textContent = 'Initializing scraper...';
-                document.getElementById('action-log').innerHTML = '';
-            } else {
-                console.error('progress-container element not found!');
-            }
-
-            // Clear existing deals
-            const dealsList = document.getElementById('deals-list');
-            if (dealsList) {
-                dealsList.innerHTML = '<div class="loading"><div class="spinner"></div>Searching for deals...</div>';
-            }
-
-            const statsEl = document.getElementById('stats');
-            if (statsEl) {
-                statsEl.style.display = 'none';
-            }
-
-            const url = demo ? '/api/scrape?demo=true' : '/api/scrape';
-
-            try {
-                console.log('Starting scraper with URL:', url);
-                const response = await fetch(url, { method: 'POST' });
-                const data = await response.json();
-                console.log('Scraper response:', data);
-
-                if (data.status === 'started') {
-                    showStatus('Scraper running... This may take 5-15 minutes', 'running');
-                    statusCheckInterval = setInterval(checkStatus, 1000);  // Check every second
-
-                    // Start polling for deals in real-time
-                    dealsPollingInterval = setInterval(loadDeals, 2000);
-                }
-            } catch (error) {
-                console.error('Scraper error:', error);
-                showStatus('Error starting scraper: ' + error.message, 'error');
-                btn.disabled = false;
-
-                // Show error in progress container
-                if (progressContainer) {
-                    const progressFill = document.getElementById('progress-fill');
-                    progressFill.style.background = 'linear-gradient(90deg, #ff4444 0%, #cc0000 100%)';
-                    progressFill.style.width = '100%';
-                    progressFill.textContent = 'ERROR';
-
-                    document.getElementById('current-action').innerHTML = `<span style="color: #ff4444;">❌ Error: ${error.message}</span>`;
-
-                    const actionLog = document.getElementById('action-log');
-                    actionLog.innerHTML = `<div class="action-log-item" style="color: #ff4444; border-left-color: #ff4444;">
-                        <span class="time">${new Date().toTimeString().substr(0,8)}</span>❌ Scraper failed to start: ${error.message}
-                    </div>`;
-
-                    // Hide progress container after delay
-                    setTimeout(() => {
-                        progressContainer.classList.remove('active');
-                    }, 10000);
-                }
-            }
-        }
-
-        async function checkStatus() {
-            try {
-                const response = await fetch('/api/status');
-                const data = await response.json();
-
-                // Update progress bar
-                if (data.running && data.progress !== undefined) {
-                    const progressFill = document.getElementById('progress-fill');
-                    progressFill.style.width = data.progress + '%';
-                    progressFill.textContent = data.progress + '%';
-                }
-
-                // Update current action
-                if (data.current_action) {
-                    document.getElementById('current-action').textContent = data.current_action;
-                }
-
-                // Update action log
-                if (data.action_log && data.action_log.length > 0) {
-                    const actionLog = document.getElementById('action-log');
-                    actionLog.innerHTML = data.action_log.map(log =>
-                        `<div class="action-log-item"><span class="time">${log.time}</span>${log.message}</div>`
-                    ).reverse().join('');
-                    // Auto-scroll to bottom
-                    actionLog.scrollTop = actionLog.scrollHeight;
-                }
-
-                if (!data.running && data.last_run) {
-                    clearInterval(statusCheckInterval);
-                    clearInterval(dealsPollingInterval);  // Stop polling
-                    document.getElementById('scrape-btn').disabled = false;
-
-                    // Hide progress container after a delay
-                    setTimeout(() => {
-                        document.getElementById('progress-container').classList.remove('active');
-                    }, 5000);
-
-                    if (data.error) {
-                        showStatus('Scraper error: ' + data.error, 'error');
-
-                        // Show error in progress container
-                        const progressFill = document.getElementById('progress-fill');
-                        if (progressFill) {
-                            progressFill.style.background = 'linear-gradient(90deg, #ff4444 0%, #cc0000 100%)';
-                            progressFill.style.width = '100%';
-                            progressFill.textContent = 'ERROR';
-                        }
-
-                        const currentAction = document.getElementById('current-action');
-                        if (currentAction) {
-                            currentAction.innerHTML = `<span style="color: #ff4444;">❌ Scraper Error: ${data.error}</span>`;
-                        }
-
-                        const actionLog = document.getElementById('action-log');
-                        if (actionLog) {
-                            const errorEntry = `<div class="action-log-item" style="color: #ff4444; border-left-color: #ff4444;">
-                                <span class="time">${new Date().toTimeString().substr(0,8)}</span>❌ ERROR: ${data.error}
-                            </div>`;
-                            actionLog.innerHTML = errorEntry + actionLog.innerHTML;
-                        }
-
-                        // Hide progress container after longer delay for errors
-                        setTimeout(() => {
-                            document.getElementById('progress-container').classList.remove('active');
-                        }, 15000);
-                    } else {
-                        showStatus('✓ Scraper completed successfully!', 'success');
-                        loadDeals();  // Final update
-                    }
-                }
-            } catch (error) {
-                console.error('Status check failed:', error);
-            }
-        }
-
-        async function loadDeals() {
-            const dealsList = document.getElementById('deals-list');
-
-            try {
-                const response = await fetch('/api/deals');
-                const deals = await response.json();
-
-                // Check if scraper is running
-                const statusResponse = await fetch('/api/status');
-                const status = await statusResponse.json();
-
-                if (deals.length === 0) {
-                    if (status.running) {
-                        dealsList.innerHTML = '<div class="loading"><div class="spinner"></div>Searching... No deals found yet.</div>';
-                    } else {
-                        dealsList.innerHTML = '<div class="loading">No deals found. Run the scraper to find opportunities!</div>';
-                    }
-                    document.getElementById('stats').style.display = 'none';
-                    return;
-                }
-
-                // Update stats
-                const totalProfit = deals.reduce((sum, d) => sum + d.net_profit, 0);
-                const avgProfit = totalProfit / deals.length;
-                const bestMargin = Math.max(...deals.map(d => d.profit_margin));
-
-                document.getElementById('total-deals').textContent = deals.length;
-                document.getElementById('total-profit').textContent = '£' + totalProfit.toLocaleString();
-                document.getElementById('avg-profit').textContent = '£' + Math.round(avgProfit).toLocaleString();
-                document.getElementById('best-margin').textContent = bestMargin.toFixed(1) + '%';
-                document.getElementById('stats').style.display = 'grid';
-
-                // Add live update indicator if scraper is running
-                let liveIndicator = '';
-                if (status.running) {
-                    liveIndicator = '<div style="background: rgba(255, 170, 0, 0.2); border-left: 4px solid #ffaa00; padding: 15px; margin-bottom: 20px; border-radius: 8px;"><strong>🔄 Live Updates:</strong> Deals are being added as they\'re found...</div>';
-                }
-
-                // Render deals
-                dealsList.innerHTML = liveIndicator + deals.map(deal => `
-                    <div class="deal-card">
-                        <div class="deal-title">${deal.title}</div>
-                        <div class="deal-info">
-                            <div class="info-item">
-                                <span class="info-label">Buy Price</span>
-                                <span class="info-value">£${deal.price.toLocaleString()}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Avg UK Price</span>
-                                <span class="info-value" style="color: #888;">£${deal.avg_uk_price.toLocaleString()}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Sell Price (NI)</span>
-                                <span class="info-value">£${deal.expected_ni_price.toLocaleString()}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Avg NI Price</span>
-                                <span class="info-value" style="color: #888;">£${deal.avg_ni_price.toLocaleString()}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Net Profit</span>
-                                <span class="info-value profit-highlight">£${deal.net_profit.toLocaleString()}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Margin</span>
-                                <span class="info-value">${deal.profit_margin.toFixed(1)}%</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Location</span>
-                                <span class="info-value">${deal.location} (${deal.distance} mi)</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Details</span>
-                                <span class="info-value">${deal.year} | ${deal.mileage} mi</span>
-                            </div>
-                        </div>
-                        <a href="${deal.url}" target="_blank" class="link-btn">View Listing →</a>
-                    </div>
-                `).join('');
-
-            } catch (error) {
-                dealsList.innerHTML = `<div class="loading">Error loading deals: ${error.message}</div>`;
-            }
-        }
-
-        function showStatus(message, type) {
-            const statusDiv = document.getElementById('status');
-            statusDiv.innerHTML = message;
-            statusDiv.className = `status ${type}`;
-            statusDiv.style.display = 'block';
-
-            if (type === 'success') {
-                setTimeout(() => {
-                    statusDiv.style.display = 'none';
-                }, 5000);
-            }
-        }
-
-        // Load deals on page load
-        loadDeals();
-    </script>
-</body>
-</html>
-    '''
-    return render_template_string(html)
+    return DASHBOARD_HTML
 
 
 @app.route('/api/deals')
 def get_deals():
-    """API endpoint to get current deals as JSON"""
     return jsonify(latest_deals)
 
 
 @app.route('/api/status')
 def get_status():
-    """Get scraper status"""
     return jsonify(scraper_status)
 
 
 @app.route('/api/scrape', methods=['POST'])
 def run_scrape():
-    """Trigger a scraper run"""
     if scraper_status['running']:
         return jsonify({'status': 'already_running'}), 409
 
     use_demo = request.args.get('demo', 'false').lower() == 'true'
 
-    # Run in background thread
     thread = threading.Thread(target=run_scraper_background, args=(use_demo,))
     thread.daemon = True
     thread.start()
@@ -813,8 +161,7 @@ def run_scrape():
 
 @app.route('/api/models')
 def get_models():
-    """Get target car models configuration"""
-    models_info = {
+    return jsonify({
         model: {
             'search_terms': config['search_terms'],
             'max_price': config['max_price'],
@@ -822,52 +169,42 @@ def get_models():
             'min_profit': config['min_profit']
         }
         for model, config in TARGET_CARS.items()
-    }
-    return jsonify(models_info)
+    })
 
 
 @app.route('/health')
 def health():
-    """Health check endpoint for load balancers"""
     return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
+
+
+@app.route('/api/version')
+def version():
+    return jsonify({'version': 'v3-2026-02-15', 'started': app.config.get('START_TIME', 'unknown')})
 
 
 @app.route('/search-links')
 def search_links():
-    """Generate direct search links to car websites"""
     from urllib.parse import urlencode
 
     car_models = []
     for model_key, config in TARGET_CARS.items():
-        search_term = config['search_terms'][0]  # Use first search term
+        search_term = config['search_terms'][0]
         max_price = config['max_price']
 
-        # AutoTrader link
-        autotrader_params = {
-            'postcode': 'L1',
-            'radius': '200',
-            'price-to': str(max_price),
-            'sort': 'price-asc'
-        }
-        autotrader_url = f"https://www.autotrader.co.uk/car-search?{urlencode(autotrader_params)}&search={search_term.replace(' ', '+')}"
+        autotrader_url = "https://www.autotrader.co.uk/car-search?" + urlencode({
+            'postcode': 'L1', 'radius': '200',
+            'price-to': str(max_price), 'sort': 'price-asc'
+        }) + "&search=" + search_term.replace(' ', '+')
 
-        # Gumtree link
-        gumtree_params = {
-            'search_category': 'cars',
-            'q': search_term,
-            'search_location': 'Liverpool',
-            'distance': '200',
-            'max_price': str(max_price),
-            'sort': 'price_asc'
-        }
-        gumtree_url = f"https://www.gumtree.com/search?{urlencode(gumtree_params)}"
+        gumtree_url = "https://www.gumtree.com/search?" + urlencode({
+            'search_category': 'cars', 'q': search_term,
+            'search_location': 'Liverpool', 'distance': '200',
+            'max_price': str(max_price), 'sort': 'price_asc'
+        })
 
-        # PistonHeads link
-        pistonheads_params = {
-            'keywords': search_term,
-            'price_to': str(max_price)
-        }
-        pistonheads_url = f"https://www.pistonheads.com/classifieds/used-cars?{urlencode(pistonheads_params)}"
+        pistonheads_url = "https://www.pistonheads.com/classifieds/used-cars?" + urlencode({
+            'keywords': search_term, 'price_to': str(max_price)
+        })
 
         car_models.append({
             'name': model_key.replace('_', ' ').title(),
@@ -878,252 +215,438 @@ def search_links():
             'pistonheads': pistonheads_url
         })
 
-    html = '''
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quick Search Links - Car Arbitrage</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
-            color: #e0e0e0;
-            padding: 20px;
-            min-height: 100vh;
-        }
-        .container { max-width: 1400px; margin: 0 auto; }
-        header {
-            text-align: center;
-            margin-bottom: 40px;
-            padding: 30px 20px;
-            background: rgba(26, 31, 58, 0.6);
-            border-radius: 16px;
-            border: 1px solid #00ff8833;
-        }
-        h1 {
-            color: #00ff88;
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            text-shadow: 0 0 30px rgba(0,255,136,0.6);
-        }
-        .subtitle { color: #888; font-size: 1em; }
-        .back-btn {
-            display: inline-block;
-            margin-top: 15px;
-            padding: 10px 20px;
-            background: linear-gradient(135deg, #6666ff 0%, #4444dd 100%);
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-        }
-        .back-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(102,102,255,0.4);
-        }
-        .controls {
-            background: #1a1f3a;
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 30px;
-            border: 1px solid #00ff8833;
-        }
-        .controls label {
-            color: #00ff88;
-            font-weight: 600;
-            margin-right: 10px;
-        }
-        .controls input {
-            background: #2a2f4a;
-            color: #e0e0e0;
-            border: 1px solid #00ff8833;
-            padding: 8px 12px;
-            border-radius: 6px;
-            margin: 5px;
-            width: 120px;
-        }
-        .controls button {
-            background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
-            color: #0a0e27;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 700;
-            cursor: pointer;
-            margin-left: 10px;
-        }
-        .car-section {
-            background: #1a1f3a;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 20px;
-            border: 1px solid #00ff8833;
-        }
-        .car-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #2a2f4a;
-        }
-        .car-name {
-            font-size: 1.5em;
-            color: #00ff88;
-            font-weight: 700;
-        }
-        .car-info {
-            color: #888;
-            font-size: 0.9em;
-        }
-        .links-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 15px;
-        }
-        .site-link {
-            background: linear-gradient(135deg, #2a2f4a 0%, #3a3f5a 100%);
-            padding: 20px;
-            border-radius: 10px;
-            border: 1px solid #00ff8844;
-            transition: all 0.3s;
-            text-decoration: none;
-            display: block;
-        }
-        .site-link:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(0,255,136,0.3);
-            border-color: #00ff88;
-        }
-        .site-name {
-            font-size: 1.2em;
-            color: #6666ff;
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
-        .site-desc {
-            color: #aaa;
-            font-size: 0.85em;
-            margin-bottom: 12px;
-        }
-        .open-btn {
-            display: inline-block;
-            padding: 8px 16px;
-            background: linear-gradient(135deg, #6666ff 0%, #4444dd 100%);
-            color: white;
-            border-radius: 6px;
-            font-size: 0.9em;
-            font-weight: 600;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>🔗 Quick Search Links</h1>
-            <p class="subtitle">Direct links to car listings with pre-filled search criteria</p>
-            <a href="/" class="back-btn">← Back to Dashboard</a>
-        </header>
-
-        <div class="controls">
-            <label>📍 Location:</label>
-            <input type="text" id="location" value="Liverpool" placeholder="Liverpool">
-
-            <label>📏 Radius:</label>
-            <input type="number" id="radius" value="200" placeholder="200"> miles
-
-            <button onclick="updateLinks()">🔄 Update Links</button>
-        </div>
-
-        <div id="cars-list">
-    '''
-
+    sections = ''
     for car in car_models:
-        html += f'''
+        sections += '''
         <div class="car-section">
             <div class="car-header">
-                <div>
-                    <div class="car-name">{car['name']}</div>
-                    <div class="car-info">Search: "{car['search_term']}" | Max Price: £{car['max_price']:,}</div>
-                </div>
+                <div class="car-name">{name}</div>
+                <div class="car-info">Search: "{search}" | Max: &pound;{price:,}</div>
             </div>
             <div class="links-grid">
-                <a href="{car['autotrader']}" target="_blank" class="site-link">
-                    <div class="site-name">🚗 AutoTrader UK</div>
-                    <div class="site-desc">UK's largest digital automotive marketplace</div>
-                    <span class="open-btn">Open Search →</span>
+                <a href="{at}" target="_blank" class="site-link">
+                    <div class="site-name">AutoTrader UK</div>
+                    <span class="open-btn">Open Search</span>
                 </a>
-                <a href="{car['gumtree']}" target="_blank" class="site-link">
-                    <div class="site-name">📋 Gumtree</div>
-                    <div class="site-desc">Free classified ads - often bargains here</div>
-                    <span class="open-btn">Open Search →</span>
+                <a href="{gt}" target="_blank" class="site-link">
+                    <div class="site-name">Gumtree</div>
+                    <span class="open-btn">Open Search</span>
                 </a>
-                <a href="{car['pistonheads']}" target="_blank" class="site-link">
-                    <div class="site-name">🏎️ PistonHeads</div>
-                    <div class="site-desc">Enthusiast cars and performance vehicles</div>
-                    <span class="open-btn">Open Search →</span>
+                <a href="{ph}" target="_blank" class="site-link">
+                    <div class="site-name">PistonHeads</div>
+                    <span class="open-btn">Open Search</span>
                 </a>
             </div>
         </div>
-        '''
+        '''.format(
+            name=car['name'], search=car['search_term'],
+            price=car['max_price'], at=car['autotrader'],
+            gt=car['gumtree'], ph=car['pistonheads']
+        )
 
-    html += '''
+    return SEARCH_LINKS_HTML.replace('{{CAR_SECTIONS}}', sections)
+
+
+# ============================================================
+# HTML Templates (separated from Python logic for clarity)
+# ============================================================
+
+DASHBOARD_HTML = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Car Arbitrage - Liverpool to NI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#0a0e27,#1a1f3a);color:#e0e0e0;padding:20px;min-height:100vh}
+.container{max-width:1600px;margin:0 auto}
+header{text-align:center;margin-bottom:30px;padding:30px 20px;background:rgba(26,31,58,.6);border-radius:16px;border:1px solid #00ff8833}
+h1{color:#00ff88;font-size:2.5em;margin-bottom:10px;text-shadow:0 0 30px rgba(0,255,136,.6)}
+.subtitle{color:#888;font-size:1.1em;margin-bottom:20px}
+.controls{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:20px}
+.btn{border:none;padding:12px 24px;border-radius:8px;font-size:.95em;font-weight:700;cursor:pointer;transition:all .3s;text-transform:uppercase;letter-spacing:1px;text-decoration:none;display:inline-block;color:#0a0e27}
+.btn-primary{background:linear-gradient(135deg,#00ff88,#00cc6a)}
+.btn-secondary{background:linear-gradient(135deg,#6666ff,#4444dd);color:#fff}
+.btn-search{background:linear-gradient(135deg,#ffaa00,#ff8800);color:#fff}
+.btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,255,136,.3)}
+.btn:disabled{background:#555;color:#888;cursor:not-allowed;transform:none;box-shadow:none}
+
+.progress-box{background:#1a1f3a;border-radius:12px;padding:20px;margin:20px 0;border:1px solid #6666ff44;display:none}
+.progress-bar{background:#2a2f4a;height:28px;border-radius:14px;overflow:hidden;margin:12px 0}
+.progress-fill{background:linear-gradient(90deg,#00ff88,#00cc6a);height:100%;width:0%;transition:width .4s;display:flex;align-items:center;justify-content:center;color:#0a0e27;font-weight:bold;font-size:.85em;min-width:40px}
+.progress-fill.error{background:linear-gradient(90deg,#ff4444,#cc0000)}
+.action-text{color:#00ff88;font-size:1em;padding:8px 10px;background:#2a2f4a;border-radius:6px;border-left:3px solid #00ff88;margin:8px 0}
+.action-text.error{color:#ff4444;border-left-color:#ff4444}
+.log-box{max-height:180px;overflow-y:auto;background:#0f1329;border-radius:6px;padding:8px;margin-top:10px}
+.log-item{padding:4px 8px;font-size:.85em;color:#999;border-left:2px solid #333;margin:2px 0}
+.log-item .t{color:#6666ff;margin-right:6px;font-family:monospace}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:15px;margin:20px 0;display:none}
+.stat-card{background:linear-gradient(135deg,#1a1f3a,#2a2f4a);padding:20px;border-radius:12px;border:1px solid #00ff8833;text-align:center}
+.stat-val{font-size:2.2em;color:#00ff88;font-weight:bold}
+.stat-lbl{color:#888;text-transform:uppercase;font-size:.8em;letter-spacing:1px;margin-top:4px}
+
+.deals-box{background:#1a1f3a;border-radius:16px;padding:25px;margin:25px 0;border:1px solid #00ff8833}
+.deal-card{background:#2a2f4a;padding:18px;margin:12px 0;border-radius:10px;border-left:4px solid #00ff88;transition:transform .2s}
+.deal-card:hover{transform:translateX(4px);box-shadow:0 4px 15px rgba(0,255,136,.2)}
+.deal-title{font-size:1.2em;color:#fff;font-weight:600;margin-bottom:10px}
+.deal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:10px 0}
+.deal-lbl{color:#888;font-size:.75em;text-transform:uppercase}
+.deal-val{color:#fff;font-size:1em;font-weight:600}
+.deal-profit{color:#00ff88;font-size:1.3em}
+.deal-link{display:inline-block;margin-top:10px;padding:8px 16px;background:linear-gradient(135deg,#6666ff,#4444dd);color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:.9em}
+.deal-link:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(102,102,255,.4)}
+
+.loading{text-align:center;padding:30px;color:#888;font-size:1.1em}
+.spinner{border:3px solid #2a2f4a;border-top:3px solid #00ff88;border-radius:50%;width:36px;height:36px;animation:spin 1s linear infinite;margin:15px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>Car Arbitrage Dashboard</h1>
+        <p class="subtitle">Liverpool &rarr; Northern Ireland | Live Car Deals</p>
+        <div class="controls">
+            <a href="/search-links" class="btn btn-search">Manual Search Links</a>
+            <button onclick="doScrape(false)" id="scrape-btn" class="btn btn-primary">Scrape Live Data</button>
+            <button onclick="doScrape(true)" class="btn btn-secondary">Demo Mode</button>
+            <button onclick="loadDeals()" class="btn btn-secondary">Refresh</button>
         </div>
+    </header>
+
+    <div id="msg" style="display:none"></div>
+
+    <div id="progress-box" class="progress-box">
+        <strong style="color:#6666ff">Scraping Progress</strong>
+        <div class="progress-bar"><div id="pbar" class="progress-fill">0%</div></div>
+        <div id="action-text" class="action-text">Waiting...</div>
+        <details open>
+            <summary style="color:#888;cursor:pointer;margin-top:10px;font-size:.9em">Action Log</summary>
+            <div id="log-box" class="log-box"></div>
+        </details>
     </div>
 
-    <script>
-        function updateLinks() {
-            const location = document.getElementById('location').value;
-            const radius = document.getElementById('radius').value;
+    <div class="stats" id="stats">
+        <div class="stat-card"><div class="stat-val" id="s-deals">0</div><div class="stat-lbl">Deals Found</div></div>
+        <div class="stat-card"><div class="stat-val" id="s-profit">&pound;0</div><div class="stat-lbl">Total Profit</div></div>
+        <div class="stat-card"><div class="stat-val" id="s-avg">&pound;0</div><div class="stat-lbl">Avg Profit</div></div>
+        <div class="stat-card"><div class="stat-val" id="s-margin">0%</div><div class="stat-lbl">Best Margin</div></div>
+    </div>
 
-            // Reload page with new parameters
-            window.location.href = `/search-links?location=${encodeURIComponent(location)}&radius=${radius}`;
+    <div class="deals-box">
+        <h2 style="color:#00ff88;margin-bottom:15px">Profitable Deals</h2>
+        <div id="deals"></div>
+    </div>
+</div>
+
+<script>
+var polling = null;
+var statusPoll = null;
+
+function doScrape(demo) {
+    try {
+        console.log('doScrape called, demo=' + demo);
+
+        var btn = document.getElementById('scrape-btn');
+        if (!btn) { alert('ERROR: scrape-btn not found'); return; }
+        btn.disabled = true;
+
+        // Show progress box
+        var pb = document.getElementById('progress-box');
+        if (!pb) { alert('ERROR: progress-box not found'); return; }
+        pb.style.display = 'block';
+        pb.style.visibility = 'visible';
+
+        var pbar = document.getElementById('pbar');
+        pbar.style.width = '0%';
+        pbar.textContent = '0%';
+        pbar.className = 'progress-fill';
+
+        document.getElementById('action-text').textContent = 'Starting scraper...';
+        document.getElementById('action-text').className = 'action-text';
+        document.getElementById('log-box').innerHTML = '';
+
+        // Clear deals
+        document.getElementById('deals').innerHTML = '<div class="loading"><div class="spinner"></div>Starting scraper...</div>';
+        document.getElementById('stats').style.display = 'none';
+
+        showMsg('Scraper starting...', '#ffaa00');
+
+        var url = demo ? '/api/scrape?demo=true' : '/api/scrape';
+        console.log('Posting to: ' + url);
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        xhr.onload = function() {
+            console.log('Response: ' + xhr.status + ' ' + xhr.responseText);
+            if (xhr.status === 200) {
+                var data = JSON.parse(xhr.responseText);
+                if (data.status === 'started') {
+                    showMsg('Scraper running...', '#ffaa00');
+                    statusPoll = setInterval(pollStatus, 1000);
+                    polling = setInterval(loadDeals, 3000);
+                }
+            } else if (xhr.status === 409) {
+                showMsg('Scraper already running...', '#ffaa00');
+                btn.disabled = false;
+            } else {
+                showMsg('Error: ' + xhr.status + ' ' + xhr.statusText, '#ff4444');
+                btn.disabled = false;
+                showProgressError('Failed to start scraper: HTTP ' + xhr.status);
+            }
+        };
+        xhr.onerror = function() {
+            console.log('XHR error');
+            showMsg('Network error - is the server running?', '#ff4444');
+            btn.disabled = false;
+            showProgressError('Network error - cannot reach server');
+        };
+        xhr.send();
+
+    } catch(e) {
+        alert('doScrape error: ' + e.message);
+        console.error('doScrape error:', e);
+    }
+}
+
+function pollStatus() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/status');
+    xhr.onload = function() {
+        if (xhr.status !== 200) return;
+        var data = JSON.parse(xhr.responseText);
+
+        // Update progress bar
+        var pbar = document.getElementById('pbar');
+        if (data.progress !== undefined) {
+            pbar.style.width = data.progress + '%';
+            pbar.textContent = data.progress + '%';
         }
-    </script>
-</body>
-</html>
-    '''
 
-    return html
+        // Update current action
+        if (data.current_action) {
+            var at = document.getElementById('action-text');
+            at.textContent = data.current_action;
+            at.className = 'action-text';
+        }
+
+        // Update action log
+        if (data.action_log && data.action_log.length > 0) {
+            var logHtml = '';
+            for (var i = data.action_log.length - 1; i >= 0; i--) {
+                var log = data.action_log[i];
+                logHtml += '<div class="log-item"><span class="t">' + log.time + '</span>' + escHtml(log.message) + '</div>';
+            }
+            document.getElementById('log-box').innerHTML = logHtml;
+        }
+
+        // Check if done
+        if (!data.running && data.last_run) {
+            clearInterval(statusPoll);
+            clearInterval(polling);
+            document.getElementById('scrape-btn').disabled = false;
+
+            if (data.error) {
+                showMsg('Scraper error: ' + data.error, '#ff4444');
+                showProgressError(data.error);
+            } else {
+                showMsg('Scraper completed!', '#00ff88');
+                loadDeals();
+                // Hide progress after delay
+                setTimeout(function() {
+                    document.getElementById('progress-box').style.display = 'none';
+                }, 8000);
+            }
+        }
+    };
+    xhr.onerror = function() {};
+    xhr.send();
+}
+
+function showProgressError(msg) {
+    var pbar = document.getElementById('pbar');
+    pbar.className = 'progress-fill error';
+    pbar.style.width = '100%';
+    pbar.textContent = 'ERROR';
+
+    var at = document.getElementById('action-text');
+    at.textContent = 'Error: ' + msg;
+    at.className = 'action-text error';
+}
+
+function loadDeals() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/deals');
+    xhr.onload = function() {
+        if (xhr.status !== 200) return;
+        var deals = JSON.parse(xhr.responseText);
+        var container = document.getElementById('deals');
+
+        if (deals.length === 0) {
+            container.innerHTML = '<div class="loading">No deals found yet. Click "Scrape Live Data" or "Demo Mode" to find deals.</div>';
+            document.getElementById('stats').style.display = 'none';
+            return;
+        }
+
+        // Update stats
+        var totalProfit = 0;
+        var bestMargin = 0;
+        for (var i = 0; i < deals.length; i++) {
+            totalProfit += deals[i].net_profit;
+            if (deals[i].profit_margin > bestMargin) bestMargin = deals[i].profit_margin;
+        }
+        var avgProfit = Math.round(totalProfit / deals.length);
+
+        document.getElementById('s-deals').textContent = deals.length;
+        document.getElementById('s-profit').innerHTML = '&pound;' + totalProfit.toLocaleString();
+        document.getElementById('s-avg').innerHTML = '&pound;' + avgProfit.toLocaleString();
+        document.getElementById('s-margin').textContent = bestMargin.toFixed(1) + '%';
+        document.getElementById('stats').style.display = 'grid';
+
+        // Render deal cards
+        var html = '';
+        for (var i = 0; i < deals.length; i++) {
+            var d = deals[i];
+            html += '<div class="deal-card">';
+            html += '<div class="deal-title">' + escHtml(d.title) + '</div>';
+            html += '<div class="deal-grid">';
+            html += '<div><div class="deal-lbl">Buy Price</div><div class="deal-val">&pound;' + d.price.toLocaleString() + '</div></div>';
+            html += '<div><div class="deal-lbl">Sell Price (NI)</div><div class="deal-val">&pound;' + d.expected_ni_price.toLocaleString() + '</div></div>';
+            html += '<div><div class="deal-lbl">Net Profit</div><div class="deal-val deal-profit">&pound;' + d.net_profit.toLocaleString() + '</div></div>';
+            html += '<div><div class="deal-lbl">Margin</div><div class="deal-val">' + d.profit_margin.toFixed(1) + '%</div></div>';
+            html += '<div><div class="deal-lbl">Location</div><div class="deal-val">' + escHtml(d.location) + ' (' + d.distance + ' mi)</div></div>';
+            html += '<div><div class="deal-lbl">Source</div><div class="deal-val">' + escHtml(d.source) + '</div></div>';
+            html += '</div>';
+            if (d.url) {
+                html += '<a href="' + escAttr(d.url) + '" target="_blank" class="deal-link">View Listing &rarr;</a>';
+            }
+            html += '</div>';
+        }
+        container.innerHTML = html;
+    };
+    xhr.onerror = function() {};
+    xhr.send();
+}
+
+function showMsg(text, color) {
+    var el = document.getElementById('msg');
+    el.textContent = text;
+    el.style.display = 'block';
+    el.style.textAlign = 'center';
+    el.style.padding = '12px';
+    el.style.margin = '15px 0';
+    el.style.borderRadius = '8px';
+    el.style.fontSize = '1em';
+    el.style.color = color;
+    el.style.background = 'rgba(' + (color === '#ff4444' ? '255,68,68' : color === '#00ff88' ? '0,255,136' : '255,170,0') + ',.15)';
+    el.style.border = '1px solid ' + color;
+
+    if (color === '#00ff88') {
+        setTimeout(function() { el.style.display = 'none'; }, 5000);
+    }
+}
+
+function escHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function escAttr(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+}
+
+// Load deals on page load
+loadDeals();
+
+// Version check - proves new code is running
+(function() {
+    var vx = new XMLHttpRequest();
+    vx.open('GET', '/api/version');
+    vx.onload = function() {
+        if (vx.status === 200) {
+            var v = JSON.parse(vx.responseText);
+            console.log('Server version: ' + v.version);
+            var tag = document.createElement('div');
+            tag.style.cssText = 'position:fixed;bottom:5px;right:5px;background:#1a1f3a;color:#6666ff;padding:4px 10px;border-radius:4px;font-size:11px;border:1px solid #6666ff44;z-index:9999';
+            tag.textContent = v.version;
+            document.body.appendChild(tag);
+        } else {
+            console.log('Version check failed - OLD CODE may be running');
+            var tag = document.createElement('div');
+            tag.style.cssText = 'position:fixed;bottom:5px;right:5px;background:#ff4444;color:#fff;padding:4px 10px;border-radius:4px;font-size:11px;z-index:9999';
+            tag.textContent = 'OLD CODE - restart server';
+            document.body.appendChild(tag);
+        }
+    };
+    vx.onerror = function() {
+        console.log('Version check error');
+    };
+    vx.send();
+})();
+</script>
+</body>
+</html>'''
+
+SEARCH_LINKS_HTML = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Search Links - Car Arbitrage</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#0a0e27,#1a1f3a);color:#e0e0e0;padding:20px;min-height:100vh}
+.container{max-width:1400px;margin:0 auto}
+header{text-align:center;margin-bottom:30px;padding:25px;background:rgba(26,31,58,.6);border-radius:16px;border:1px solid #00ff8833}
+h1{color:#00ff88;font-size:2em;margin-bottom:8px}
+.back{display:inline-block;margin-top:12px;padding:8px 18px;background:linear-gradient(135deg,#6666ff,#4444dd);color:#fff;text-decoration:none;border-radius:8px;font-weight:600}
+.car-section{background:#1a1f3a;border-radius:12px;padding:22px;margin-bottom:18px;border:1px solid #00ff8833}
+.car-header{margin-bottom:15px;padding-bottom:12px;border-bottom:1px solid #2a2f4a}
+.car-name{font-size:1.4em;color:#00ff88;font-weight:700}
+.car-info{color:#888;font-size:.85em;margin-top:4px}
+.links-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.site-link{background:#2a2f4a;padding:18px;border-radius:10px;border:1px solid #00ff8844;text-decoration:none;display:block;transition:all .3s}
+.site-link:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,255,136,.2);border-color:#00ff88}
+.site-name{font-size:1.1em;color:#6666ff;font-weight:700;margin-bottom:6px}
+.open-btn{display:inline-block;padding:6px 14px;background:linear-gradient(135deg,#6666ff,#4444dd);color:#fff;border-radius:6px;font-size:.85em;font-weight:600}
+</style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>Quick Search Links</h1>
+        <p style="color:#888">Direct links to car listings with pre-filled search criteria</p>
+        <a href="/" class="back">&larr; Back to Dashboard</a>
+    </header>
+    {{CAR_SECTIONS}}
+</div>
+</body>
+</html>'''
 
 
 if __name__ == '__main__':
-    # Create output directory
+    app.config['START_TIME'] = datetime.now().isoformat()
+
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # Load demo data on startup
-    finder = CarArbitrageFinder()
-    finder.profitable_deals = [d for d in create_sample_data() if d.is_profitable()]
-    latest_deals = [
-        {
-            'model_type': d.model_type,
-            'title': d.title,
-            'price': d.price,
-            'avg_uk_price': d.avg_uk_price,
-            'uk_saving': d.uk_saving,
-            'expected_ni_price': d.expected_ni_price,
-            'avg_ni_price': d.avg_ni_price,
-            'net_profit': d.net_profit,
-            'profit_margin': d.profit_margin,
-            'location': d.location,
-            'distance': round(d.distance, 1),
-            'year': d.year,
-            'mileage': d.mileage,
-            'source': d.source,
-            'url': d.url
-        }
-        for d in sorted(finder.profitable_deals, key=lambda x: x.net_profit, reverse=True)
-    ]
+    try:
+        finder = CarArbitrageFinder()
+        finder.profitable_deals = [d for d in create_sample_data() if d.is_profitable()]
+        latest_deals = [deal_to_dict(d) for d in sorted(finder.profitable_deals, key=lambda x: x.net_profit, reverse=True)]
+        print(f"Loaded {len(latest_deals)} demo deals on startup")
+    except Exception as e:
+        print(f"WARNING: Could not load demo data: {e}")
+        latest_deals = []
 
-    # Run Flask app
     print("\n" + "="*60)
     print("  CAR ARBITRAGE WEB APP STARTING")
     print("="*60)
-    print("\n🌐 Access the dashboard at: http://localhost:5000")
-    print("📡 API endpoints available at: http://localhost:5000/api/*")
-    print("\n" + "="*60 + "\n")
+    print("\nDashboard: http://localhost:5000")
+    print("API:       http://localhost:5000/api/deals")
+    print("=" * 60 + "\n")
 
     app.run(host='0.0.0.0', port=5000, debug=False)

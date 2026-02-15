@@ -29,10 +29,33 @@ if [ ! -d "venv" ]; then
     echo "❌ Virtual environment not found!"
     echo "   Creating virtual environment..."
     python3 -m venv venv
-    source venv/bin/activate
-    pip install -r requirements.txt
-else
-    echo "✅ Virtual environment found"
+fi
+
+# Always install/update requirements
+echo "📦 Installing/updating Python packages..."
+source "$SCRIPT_DIR/venv/bin/activate"
+pip install -q -r requirements.txt
+echo "✅ Packages installed"
+
+# Quick syntax check
+echo "🔍 Checking Python files for errors..."
+"$SCRIPT_DIR/venv/bin/python" -c "
+import py_compile, sys
+errors = []
+for f in ['app.py', 'car_scraper.py']:
+    try:
+        py_compile.compile(f, doraise=True)
+    except py_compile.PyCompileError as e:
+        errors.append(str(e))
+if errors:
+    print('ERRORS FOUND:')
+    for e in errors: print('  ' + e)
+    sys.exit(1)
+print('All Python files OK')
+"
+if [ $? -ne 0 ]; then
+    echo "❌ Python files have errors! Fix before deploying."
+    exit 1
 fi
 
 # Create systemd service file with correct paths
@@ -129,10 +152,24 @@ if sudo systemctl is-active --quiet car-arbitrage; then
     # Get public IP (try multiple methods)
     PUBLIC_IP=$(curl -s ifconfig.me 2>/dev/null || curl -s icanhazip.com 2>/dev/null || hostname -I | awk '{print $1}')
 
+    # Verify Flask is actually responding
+    echo "🔍 Verifying Flask is responding..."
+    sleep 1
+    HEALTH=$(curl -s http://127.0.0.1:5000/api/version 2>/dev/null)
+    if [ -n "$HEALTH" ]; then
+        echo "✅ Flask responding: $HEALTH"
+    else
+        echo "⚠️  Flask not responding on port 5000 yet"
+        echo "   Checking logs for errors..."
+        sudo journalctl -u car-arbitrage -n 20 --no-pager
+    fi
+
     if [ -n "$PUBLIC_IP" ]; then
+        echo ""
         echo "🌐 Access your application at:"
         echo ""
         echo "   Dashboard:  http://$PUBLIC_IP/"
+        echo "   Version:    http://$PUBLIC_IP/api/version"
         echo "   API:        http://$PUBLIC_IP/api/deals"
         echo "   Status:     http://$PUBLIC_IP/api/status"
         echo "   Health:     http://$PUBLIC_IP/health"
