@@ -219,10 +219,10 @@ def search_links():
         search_term = config['search_terms'][0]
         max_price = config['max_price']
 
-        autotrader_url = "https://www.autotrader.co.uk/car-search?" + urlencode({
-            'postcode': 'L1', 'radius': '200',
-            'price-to': str(max_price), 'sort': 'price-asc'
-        }) + "&search=" + search_term.replace(' ', '+')
+        ebay_url = "https://www.ebay.co.uk/sch/Cars/9801/i.html?" + urlencode({
+            '_nkw': search_term, '_udlo': '200',
+            '_udhi': str(max_price), 'LH_ItemCondition': '3000', '_sop': '2'
+        })
 
         gumtree_url = "https://www.gumtree.com/search?" + urlencode({
             'search_category': 'cars', 'q': search_term,
@@ -230,15 +230,19 @@ def search_links():
             'max_price': str(max_price), 'sort': 'price_asc'
         })
 
-        pistonheads_url = "https://www.pistonheads.com/classifieds/used-cars?" + urlencode({
-            'keywords': search_term, 'price_to': str(max_price)
-        })
+        # Use model-specific PistonHeads URL if available
+        from car_scraper import PistonHeadsScraper
+        ph_urls = PistonHeadsScraper.MODEL_URLS.get(model_key, [])
+        if ph_urls:
+            pistonheads_url = "https://www.pistonheads.com" + ph_urls[0]
+        else:
+            pistonheads_url = "https://www.pistonheads.com/buy/" + config.get('make', '').lower()
 
         car_models.append({
             'name': model_key.replace('_', ' ').title(),
             'search_term': search_term,
             'max_price': max_price,
-            'autotrader': autotrader_url,
+            'ebay': ebay_url,
             'gumtree': gumtree_url,
             'pistonheads': pistonheads_url
         })
@@ -252,8 +256,8 @@ def search_links():
                 <div class="car-info">Search: "{search}" | Max: &pound;{price:,}</div>
             </div>
             <div class="links-grid">
-                <a href="{at}" target="_blank" class="site-link">
-                    <div class="site-name">AutoTrader UK</div>
+                <a href="{eb}" target="_blank" class="site-link">
+                    <div class="site-name">eBay Motors</div>
                     <span class="open-btn">Open Search</span>
                 </a>
                 <a href="{gt}" target="_blank" class="site-link">
@@ -268,7 +272,7 @@ def search_links():
         </div>
         '''.format(
             name=car['name'], search=car['search_term'],
-            price=car['max_price'], at=car['autotrader'],
+            price=car['max_price'], eb=car['ebay'],
             gt=car['gumtree'], ph=car['pistonheads']
         )
 
@@ -439,24 +443,32 @@ var allDeals = [];
 var modelLabels = {
     'peugeot_306_dturbo': 'Peugeot 306 D-Turbo',
     'lexus_is200_sport': 'Lexus IS200 Sport',
-    'lexus_is250_sport': 'Lexus IS250 Sport',
+    'lexus_is250_sport': 'Lexus IS250 Sport Manual',
     'bmw_e46_330ci': 'BMW E46 330ci',
     'bmw_e46_m3': 'BMW E46 M3',
-    'honda_civic_ep3_type_r': 'Honda Civic EP3 Type R',
+    'bmw_e36_328i': 'BMW E36 328i',
+    'bmw_e36_325i': 'BMW E36 325i',
+    'bmw_e36_m3': 'BMW E36 M3',
+    'bmw_e30_325i': 'BMW E30 325i',
     'bmw_e60_530d': 'BMW E60 530d',
     'bmw_e60_535d': 'BMW E60 535d',
     'bmw_f30_330d': 'BMW F30 330d',
-    'bmw_f30_335d': 'BMW F30 335d',
+    'bmw_e92_335i': 'BMW E92 335i',
+    'honda_civic_ep3_type_r': 'Honda Civic EP3 Type R',
+    'honda_civic_ek_vti': 'Honda Civic EK VTi',
+    'honda_integra_dc2': 'Honda Integra DC2 Type R',
     'mitsubishi_evo': 'Mitsubishi Evo 6/7/8/9',
     'subaru_impreza_wrx': 'Subaru Impreza WRX/STI',
     'toyota_starlet_glanza': 'Toyota Starlet Glanza',
-    'honda_integra_dc2': 'Honda Integra DC2 Type R',
     'nissan_200sx_s14_s15': 'Nissan 200SX / Silvia',
+    'nissan_skyline_r33': 'Nissan Skyline R33 GTS-T',
     'nissan_350z': 'Nissan 350Z',
     'mazda_mx5_na_nb': 'Mazda MX-5 (NA/NB)',
     'toyota_mr2_sw20': 'Toyota MR2 SW20 Turbo',
     'ford_sierra_cosworth': 'Ford Sierra Cosworth',
-    'ford_escort_rs_turbo': 'Ford Escort RS Turbo'
+    'ford_escort_rs_turbo': 'Ford Escort RS Turbo',
+    'ford_escort_mk2': 'Ford Escort Mk2',
+    'vw_golf_gti_mk2': 'VW Golf GTI Mk2'
 };
 
 var fallbackImages = {
@@ -465,21 +477,29 @@ var fallbackImages = {
     'lexus_is250_sport': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg/640px-1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg',
     'bmw_e46_330ci': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/BMW_E46_Coup%C3%A9_front_20080111.jpg/640px-BMW_E46_Coup%C3%A9_front_20080111.jpg',
     'bmw_e46_m3': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/BMW_M3_E46_%282%29.jpg/640px-BMW_M3_E46_%282%29.jpg',
-    'honda_civic_ep3_type_r': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Honda_Civic_Type_R_%28EP3%29.jpg/640px-Honda_Civic_Type_R_%28EP3%29.jpg',
+    'bmw_e36_328i': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/BMW_328i_%28E36%29_front.jpg/640px-BMW_328i_%28E36%29_front.jpg',
+    'bmw_e36_325i': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/BMW_328i_%28E36%29_front.jpg/640px-BMW_328i_%28E36%29_front.jpg',
+    'bmw_e36_m3': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/BMW_M3_%28E36%29_front.jpg/640px-BMW_M3_%28E36%29_front.jpg',
+    'bmw_e30_325i': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/BMW_E30_front_20080127.jpg/640px-BMW_E30_front_20080127.jpg',
     'bmw_e60_530d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/BMW_E60_front_20080417.jpg/640px-BMW_E60_front_20080417.jpg',
     'bmw_e60_535d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/BMW_E60_front_20080417.jpg/640px-BMW_E60_front_20080417.jpg',
     'bmw_f30_330d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/BMW_F30_320d_Sportline_Mineralgrau.jpg/640px-BMW_F30_320d_Sportline_Mineralgrau.jpg',
-    'bmw_f30_335d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/BMW_F30_320d_Sportline_Mineralgrau.jpg/640px-BMW_F30_320d_Sportline_Mineralgrau.jpg',
+    'bmw_e92_335i': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/2007_BMW_335i_Coupe.jpg/640px-2007_BMW_335i_Coupe.jpg',
+    'honda_civic_ep3_type_r': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Honda_Civic_Type_R_%28EP3%29.jpg/640px-Honda_Civic_Type_R_%28EP3%29.jpg',
+    'honda_civic_ek_vti': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Honda_Civic_%28sixth_generation%29_%28front%29%2C_Serdang.jpg/640px-Honda_Civic_%28sixth_generation%29_%28front%29%2C_Serdang.jpg',
+    'honda_integra_dc2': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/1999-2001_Honda_Integra_Type_R.jpg/640px-1999-2001_Honda_Integra_Type_R.jpg',
     'mitsubishi_evo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Mitsubishi_Lancer_Evolution_VII.jpg/640px-Mitsubishi_Lancer_Evolution_VII.jpg',
     'subaru_impreza_wrx': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Subaru_Impreza_WRX_STI_%28GDB%29.jpg/640px-Subaru_Impreza_WRX_STI_%28GDB%29.jpg',
     'toyota_starlet_glanza': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Toyota_Starlet_1.3_GL_%28EP91%29.jpg/640px-Toyota_Starlet_1.3_GL_%28EP91%29.jpg',
-    'honda_integra_dc2': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/1999-2001_Honda_Integra_Type_R.jpg/640px-1999-2001_Honda_Integra_Type_R.jpg',
     'nissan_200sx_s14_s15': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Nissan_200SX_%28S14%29.jpg/640px-Nissan_200SX_%28S14%29.jpg',
+    'nissan_skyline_r33': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Nissan_Skyline_R33_GT-R_01.jpg/640px-Nissan_Skyline_R33_GT-R_01.jpg',
     'nissan_350z': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Nissan_350Z_--_09-07-2009.jpg/640px-Nissan_350Z_--_09-07-2009.jpg',
     'mazda_mx5_na_nb': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Mazda_MX-5_%28NA%29.jpg/640px-Mazda_MX-5_%28NA%29.jpg',
     'toyota_mr2_sw20': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Toyota_MR2_%28SW20%29.jpg/640px-Toyota_MR2_%28SW20%29.jpg',
     'ford_sierra_cosworth': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Ford_Sierra_RS_Cosworth.jpg/640px-Ford_Sierra_RS_Cosworth.jpg',
-    'ford_escort_rs_turbo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Ford_Escort_RS_Turbo_%2814433268513%29.jpg/640px-Ford_Escort_RS_Turbo_%2814433268513%29.jpg'
+    'ford_escort_rs_turbo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Ford_Escort_RS_Turbo_%2814433268513%29.jpg/640px-Ford_Escort_RS_Turbo_%2814433268513%29.jpg',
+    'ford_escort_mk2': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Ford_Escort_Mk_II.jpg/640px-Ford_Escort_Mk_II.jpg',
+    'vw_golf_gti_mk2': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/VW_Golf_II_GTI.jpg/640px-VW_Golf_II_GTI.jpg'
 };
 
 function doScrape(demo) {

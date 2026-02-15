@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Car Arbitrage Scraper - Liverpool to Northern Ireland
-Scrapes AutoTrader, Gumtree, and PistonHeads for car deals
+Scrapes eBay Motors, PistonHeads, and Gumtree for car deals
 """
 
 import requests
@@ -26,231 +26,401 @@ COSTS_PER_CAR = 650  # Ferry £200 + Fuel £100 + Insurance £250 + Admin £100
 
 # TEMPORARY: VERY LENIENT SETTINGS - Testing to prove scraper works
 TARGET_CARS = {
+    # ═══════════════════════════════════════════════════════════════
+    # NI VALUE ANALYSIS - Manual Only - Prices researched Feb 2026
+    # England avg = typical advertised price on Gumtree/AT/PH
+    # NI avg = typical Facebook Marketplace / dealer price in NI
+    # ni_markup = conservative realistic flip margin after costs
+    # ═══════════════════════════════════════════════════════════════
+
+    # ── FRENCH CLASSICS ──────────────────────────────────────────
     'peugeot_306_dturbo': {
         'search_terms': ['Peugeot 306 D-Turbo', 'Peugeot 306 DTurbo', '306 D Turbo'],
         'make': 'Peugeot', 'model': '306',
-        'max_price': 5000,
-        'ni_markup': 2700,
+        'max_price': 4000, 'max_mileage': 130000,
+        'ni_markup': 2000,
         'min_profit': 1000,
-        'avg_uk_price': 3500,
-        'avg_ni_price': 6200,
+        'avg_uk_price': 2500,
+        'avg_ni_price': 4500,
         'require_keywords': ['d-turbo', 'dturbo', 'd turbo', 'dt', 'diesel turbo'],
-        'exclude_keywords': ['petrol', 'gti', 'xsi', 'rallye', 'cabriolet', 'estate']
+        'exclude_keywords': ['petrol', 'gti', 'xsi', 'rallye', 'cabriolet', 'estate',
+                             'auto', 'automatic', 'tiptronic', 'non runner', 'spares', 'project']
     },
+
+    # ── LEXUS ────────────────────────────────────────────────────
     'lexus_is200_sport': {
-        'search_terms': ['Lexus IS200 Sport', 'IS200 Sport', 'IS 200 Sport'],
+        'search_terms': ['Lexus IS200', 'Lexus IS 200', 'IS200 Sport'],
         'make': 'Lexus', 'model': 'IS',
-        'max_price': 6000,
-        'ni_markup': 2700,
+        'max_price': 5000, 'max_mileage': 140000,
+        'ni_markup': 2000,
         'min_profit': 1000,
-        'avg_uk_price': 3000,
-        'avg_ni_price': 5700,
+        'avg_uk_price': 2500,
+        'avg_ni_price': 4500,
+        'year_min': 1999, 'year_max': 2005,
         'require_keywords': ['sport'],
-        'exclude_keywords': ['se', 's.e', 'se auto']
+        'exclude_keywords': ['se', 's.e.', 'auto', 'automatic', 'is250', 'is300',
+                             'non runner', 'spares', 'breaking']
     },
     'lexus_is250_sport': {
-        'search_terms': ['Lexus IS250 Sport', 'IS250 Sport manual', 'IS 250 Sport'],
+        'search_terms': ['Lexus IS250', 'Lexus IS 250', 'IS250 Sport'],
         'make': 'Lexus', 'model': 'IS',
-        'max_price': 8000,
-        'ni_markup': 2700,
+        'max_price': 6000, 'max_mileage': 120000,
+        'ni_markup': 2000,
         'min_profit': 1000,
-        'avg_uk_price': 4500,
-        'avg_ni_price': 7200,
+        'avg_uk_price': 3500,
+        'avg_ni_price': 5500,
+        'year_min': 2005, 'year_max': 2013,
         'require_keywords': ['sport'],
-        'exclude_keywords': ['se', 's.e', 'auto', 'automatic']
+        'exclude_keywords': ['se', 's.e.', 'auto', 'automatic', 'is200', 'is300', 'is220',
+                             'non runner', 'spares', 'breaking']
     },
+
+    # ── BMW E46 (Drift / Show) ───────────────────────────────────
     'bmw_e46_330ci': {
-        'search_terms': ['BMW 330ci', 'E46 330ci', '330ci Sport', '330ci M Sport', 'BMW 330 ci'],
+        'search_terms': ['BMW 330ci', 'E46 330ci', 'BMW 330 ci'],
         'make': 'BMW', 'model': '3 Series',
-        'max_price': 8000,
-        'ni_markup': 2800,
-        'min_profit': 1000,
-        'avg_uk_price': 5000,
-        'avg_ni_price': 7800,
-        'year_min': 1999, 'year_max': 2006,
-        'require_keywords': ['330ci', '330 ci', '330 coupe', '330i coupe', 'e46'],
-        'exclude_keywords': ['e90', 'e92', 'f30', 'f32', 'g20', 'g22', '2007', '2008', '2009', '2010', '2011', '2012', '2013', '2014', '2015', '2016', '2017', '2018', '2019', '2020', 'touring', 'estate']
-    },
-    'bmw_e46_m3': {
-        'search_terms': ['BMW M3 E46', 'E46 M3', 'BMW M3 coupe', 'BMW M3 convertible'],
-        'make': 'BMW', 'model': 'M3',
-        'max_price': 25000,
-        'ni_markup': 4000,
-        'min_profit': 1000,
-        'avg_uk_price': 18000,
-        'avg_ni_price': 22000,
-        'year_min': 2000, 'year_max': 2006,
-        'require_keywords': ['m3'],
-        'exclude_keywords': ['e90', 'e92', 'f80', 'g80', 'e36', 'e30', '2007', '2008', '2009', '2010', '2011', '2012', '2013', '2014', '2015', '2016', '2017', '2018', '2019', '2020', 'competition', 'cs']
-    },
-    'honda_civic_ep3_type_r': {
-        'search_terms': ['Honda Civic Type R EP3', 'Civic EP3 Type R', 'EP3 Type R', 'Honda Civic Type R'],
-        'make': 'Honda', 'model': 'Civic',
-        'max_price': 12000,
-        'ni_markup': 3500,
-        'min_profit': 1000,
-        'avg_uk_price': 7500,
-        'avg_ni_price': 11000,
-        'year_min': 2001, 'year_max': 2005,
-        'exclude_keywords': ['fn2', 'fk2', 'fk8', 'fl5', '2006', '2007', '2008', '2009', '2010', '2011']
-    },
-    'bmw_e60_530d': {
-        'search_terms': ['BMW 530d', 'BMW 5 Series 530d', 'E60 530d', '530d Sport'],
-        'make': 'BMW', 'model': '5 Series',
-        'max_price': 7000,
-        'ni_markup': 2700,
-        'min_profit': 1000,
-        'avg_uk_price': 4500,
-        'avg_ni_price': 7200,
-        'year_min': 2003, 'year_max': 2010,
-        'require_keywords': ['530d', '530 d', '530'],
-        'exclude_keywords': ['f10', 'g30', 'touring', 'estate']
-    },
-    'bmw_e60_535d': {
-        'search_terms': ['BMW 535d', 'BMW 5 Series 535d', 'E60 535d', '535d M-Sport'],
-        'make': 'BMW', 'model': '5 Series',
-        'max_price': 9000,
-        'ni_markup': 2800,
-        'min_profit': 1000,
-        'avg_uk_price': 5500,
-        'avg_ni_price': 8300,
-        'year_min': 2004, 'year_max': 2010,
-        'require_keywords': ['535d', '535 d', '535'],
-        'exclude_keywords': ['f10', 'g30', 'touring', 'estate']
-    },
-    'bmw_f30_330d': {
-        'search_terms': ['BMW 330d', 'BMW 3 Series 330d', 'F30 330d', '330d M-Sport'],
-        'make': 'BMW', 'model': '3 Series',
-        'max_price': 18000,
-        'ni_markup': 3000,
-        'min_profit': 1000,
-        'avg_uk_price': 12000,
-        'avg_ni_price': 15000,
-        'year_min': 2012, 'year_max': 2019,
-        'require_keywords': ['330d', '330 d'],
-        'exclude_keywords': ['e46', 'e90', 'g20', 'touring', 'estate']
-    },
-    'bmw_f30_335d': {
-        'search_terms': ['BMW 335d', 'BMW 3 Series 335d', 'F30 335d', '335d xDrive'],
-        'make': 'BMW', 'model': '3 Series',
-        'max_price': 22000,
-        'ni_markup': 3500,
-        'min_profit': 1000,
-        'avg_uk_price': 15000,
-        'avg_ni_price': 18500,
-        'year_min': 2012, 'year_max': 2019,
-        'require_keywords': ['335d', '335 d'],
-        'exclude_keywords': ['e90', 'g20', 'touring', 'estate']
-    },
-    'mitsubishi_evo': {
-        'search_terms': ['Mitsubishi Evo', 'Mitsubishi Lancer Evolution', 'Evo 6', 'Evo 7', 'Evo 8', 'Evo 9'],
-        'make': 'Mitsubishi', 'model': 'Lancer',
-        'max_price': 20000,
-        'ni_markup': 4500,
-        'min_profit': 1000,
-        'avg_uk_price': 14000,
-        'avg_ni_price': 18500,
-        'require_keywords': ['evo', 'evolution'],
-        'exclude_keywords': ['evo x', 'evo 10', 'fq-440', 'non runner', 'spares']
-    },
-    'subaru_impreza_wrx': {
-        'search_terms': ['Subaru Impreza WRX', 'Subaru WRX STI', 'Impreza WRX', 'Impreza STI'],
-        'make': 'Subaru', 'model': 'Impreza',
-        'max_price': 15000,
-        'ni_markup': 3500,
-        'min_profit': 1000,
-        'avg_uk_price': 9000,
-        'avg_ni_price': 12500,
-        'require_keywords': ['wrx', 'sti', 'turbo'],
-        'exclude_keywords': ['non runner', 'spares', 'breaking']
-    },
-    'toyota_starlet_glanza': {
-        'search_terms': ['Toyota Starlet Glanza', 'Starlet GT Turbo', 'Toyota Glanza V', 'EP91 Glanza'],
-        'make': 'Toyota', 'model': 'Starlet',
-        'max_price': 8000,
-        'ni_markup': 3500,
-        'min_profit': 1000,
-        'avg_uk_price': 5000,
-        'avg_ni_price': 8500,
-        'require_keywords': ['glanza', 'gt turbo', 'gt-turbo'],
-        'exclude_keywords': ['non runner', 'spares', 'breaking', 'shell']
-    },
-    'honda_integra_dc2': {
-        'search_terms': ['Honda Integra Type R', 'Integra DC2', 'DC2 Type R', 'Honda Integra'],
-        'make': 'Honda', 'model': 'Integra',
-        'max_price': 20000,
-        'ni_markup': 4000,
-        'min_profit': 1000,
-        'avg_uk_price': 14000,
-        'avg_ni_price': 18000,
-        'require_keywords': ['type r', 'type-r', 'dc2'],
-        'exclude_keywords': ['dc5', 'non runner', 'spares', 'breaking']
-    },
-    'nissan_200sx_s14_s15': {
-        'search_terms': ['Nissan 200SX', 'Nissan Silvia S14', 'Nissan Silvia S15', 'Nissan 200SX S14'],
-        'make': 'Nissan', 'model': '200SX',
-        'max_price': 15000,
-        'ni_markup': 4000,
-        'min_profit': 1000,
-        'avg_uk_price': 9000,
-        'avg_ni_price': 13000,
-        'require_keywords': ['200sx', 'silvia', 's14', 's15'],
-        'exclude_keywords': ['non runner', 'spares', 'breaking', 'shell']
-    },
-    'nissan_350z': {
-        'search_terms': ['Nissan 350Z', '350Z GT', '350Z sport', 'Nissan 350 Z'],
-        'make': 'Nissan', 'model': '350Z',
-        'max_price': 12000,
-        'ni_markup': 3000,
-        'min_profit': 1000,
-        'avg_uk_price': 7000,
-        'avg_ni_price': 10000,
-        'exclude_keywords': ['370z', 'non runner', 'spares', 'breaking', 'cat d', 'cat s', 'cat n']
-    },
-    'mazda_mx5_na_nb': {
-        'search_terms': ['Mazda MX-5', 'Mazda MX5', 'MX-5 1.8', 'Mazda Eunos'],
-        'make': 'Mazda', 'model': 'MX-5',
-        'max_price': 8000,
+        'max_price': 6000, 'max_mileage': 150000,
         'ni_markup': 2500,
         'min_profit': 1000,
-        'avg_uk_price': 4000,
-        'avg_ni_price': 6500,
-        'year_min': 1989, 'year_max': 2005,
-        'exclude_keywords': ['nc', 'nd', 'rf', '2006', '2007', '2008', '2009', '2010', '2011', '2012', 'non runner', 'spares']
+        'avg_uk_price': 3500,
+        'avg_ni_price': 6000,
+        'year_min': 1999, 'year_max': 2006,
+        'require_keywords': ['330ci', '330 ci', '330 coupe', 'e46'],
+        'exclude_keywords': ['e90', 'e92', 'f30', 'f32', 'g20', 'g22', 'touring', 'estate',
+                             'auto', 'automatic', 'steptronic', 'tiptronic', 'smg',
+                             'non runner', 'spares', 'breaking']
     },
-    'toyota_mr2_sw20': {
-        'search_terms': ['Toyota MR2 Turbo', 'MR2 SW20', 'Toyota MR2 GT', 'MR2 Rev3'],
-        'make': 'Toyota', 'model': 'MR2',
-        'max_price': 10000,
-        'ni_markup': 3000,
-        'min_profit': 1000,
-        'avg_uk_price': 6000,
-        'avg_ni_price': 9000,
-        'year_min': 1989, 'year_max': 1999,
-        'require_keywords': ['turbo', 'gt', 'sw20', 'rev', 'mr2'],
-        'exclude_keywords': ['mk1', 'aw11', 'mk3', 'zzw30', 'roadster', 'non runner', 'spares']
-    },
-    'ford_sierra_cosworth': {
-        'search_terms': ['Ford Sierra Cosworth', 'Sierra Sapphire Cosworth', 'Sierra RS Cosworth', 'Sierra Cossie'],
-        'make': 'Ford', 'model': 'Sierra',
-        'max_price': 45000,
-        'ni_markup': 6000,
-        'min_profit': 1000,
-        'avg_uk_price': 32000,
-        'avg_ni_price': 38000,
-        'require_keywords': ['cosworth', 'cossie', 'rs cosworth'],
-        'exclude_keywords': ['replica', 'kit', 'non runner', 'spares', 'project']
-    },
-    'ford_escort_rs_turbo': {
-        'search_terms': ['Ford Escort RS Turbo', 'Escort RS Turbo', 'Ford Escort RST'],
-        'make': 'Ford', 'model': 'Escort',
-        'max_price': 25000,
+    'bmw_e46_m3': {
+        'search_terms': ['BMW M3 E46', 'E46 M3', 'BMW M3 3.2'],
+        'make': 'BMW', 'model': 'M3',
+        'max_price': 22000, 'max_mileage': 130000,
         'ni_markup': 4000,
         'min_profit': 1000,
         'avg_uk_price': 16000,
         'avg_ni_price': 20000,
+        'year_min': 2000, 'year_max': 2006,
+        'require_keywords': ['m3'],
+        'exclude_keywords': ['e90', 'e92', 'f80', 'g80', 'e36', 'e30', 'competition', 'cs',
+                             'auto', 'automatic', 'smg', 'steptronic',
+                             'non runner', 'spares', 'breaking', 'project']
+    },
+
+    # ── BMW E36 (NI Drift Scene King) ────────────────────────────
+    'bmw_e36_328i': {
+        'search_terms': ['BMW 328i', 'BMW E36 328', 'E36 328i', 'BMW 328i coupe'],
+        'make': 'BMW', 'model': '3 Series',
+        'max_price': 5000, 'max_mileage': 160000,
+        'ni_markup': 2500,
+        'min_profit': 1000,
+        'avg_uk_price': 2500,
+        'avg_ni_price': 5000,
+        'year_min': 1991, 'year_max': 1999,
+        'require_keywords': ['328', 'e36'],
+        'exclude_keywords': ['e46', 'e90', 'f30', 'g20', 'touring', 'estate', 'compact',
+                             'auto', 'automatic', 'steptronic',
+                             'non runner', 'spares', 'breaking']
+    },
+    'bmw_e36_325i': {
+        'search_terms': ['BMW 325i E36', 'E36 325i', 'BMW 325i coupe'],
+        'make': 'BMW', 'model': '3 Series',
+        'max_price': 4000, 'max_mileage': 160000,
+        'ni_markup': 2000,
+        'min_profit': 1000,
+        'avg_uk_price': 1800,
+        'avg_ni_price': 3800,
+        'year_min': 1991, 'year_max': 1999,
+        'require_keywords': ['325', 'e36'],
+        'exclude_keywords': ['e46', 'e90', 'f30', 'g20', 'touring', 'estate', 'compact',
+                             'auto', 'automatic', 'steptronic',
+                             'non runner', 'spares', 'breaking']
+    },
+    'bmw_e36_m3': {
+        'search_terms': ['BMW M3 E36', 'E36 M3', 'BMW M3 3.0', 'BMW M3 3.2 E36'],
+        'make': 'BMW', 'model': 'M3',
+        'max_price': 18000, 'max_mileage': 140000,
+        'ni_markup': 3500,
+        'min_profit': 1000,
+        'avg_uk_price': 12000,
+        'avg_ni_price': 15500,
+        'year_min': 1992, 'year_max': 1999,
+        'require_keywords': ['m3', 'e36'],
+        'exclude_keywords': ['e46', 'e92', 'f80', 'g80', 'e30',
+                             'auto', 'automatic', 'smg', 'steptronic',
+                             'non runner', 'spares', 'breaking', 'project']
+    },
+
+    # ── BMW E30 (NI Classic Show Scene) ──────────────────────────
+    'bmw_e30_325i': {
+        'search_terms': ['BMW E30 325i', 'BMW E30 325', 'E30 325i Sport'],
+        'make': 'BMW', 'model': '3 Series',
+        'max_price': 12000, 'max_mileage': 160000,
+        'ni_markup': 3500,
+        'min_profit': 1000,
+        'avg_uk_price': 7000,
+        'avg_ni_price': 10500,
+        'year_min': 1982, 'year_max': 1994,
+        'require_keywords': ['e30', '325'],
+        'exclude_keywords': ['e36', 'e46', 'touring', 'estate',
+                             'auto', 'automatic',
+                             'non runner', 'spares', 'breaking', 'project']
+    },
+
+    # ── BMW DIESEL (Rare Manuals = Premium) ──────────────────────
+    'bmw_e60_530d': {
+        'search_terms': ['BMW 530d manual', 'E60 530d manual', 'BMW 530d 6 speed'],
+        'make': 'BMW', 'model': '5 Series',
+        'max_price': 6000, 'max_mileage': 150000,
+        'ni_markup': 2500,
+        'min_profit': 1000,
+        'avg_uk_price': 3500,
+        'avg_ni_price': 6000,
+        'year_min': 2003, 'year_max': 2010,
+        'require_keywords': ['530d', '530 d', '530'],
+        'exclude_keywords': ['f10', 'g30', 'touring', 'estate',
+                             'auto', 'automatic', 'steptronic', 'tiptronic',
+                             'non runner', 'spares', 'breaking']
+    },
+    'bmw_e60_535d': {
+        'search_terms': ['BMW 535d manual', 'E60 535d manual', 'BMW 535d 6 speed'],
+        'make': 'BMW', 'model': '5 Series',
+        'max_price': 7000, 'max_mileage': 140000,
+        'ni_markup': 2500,
+        'min_profit': 1000,
+        'avg_uk_price': 4000,
+        'avg_ni_price': 6500,
+        'year_min': 2004, 'year_max': 2010,
+        'require_keywords': ['535d', '535 d', '535'],
+        'exclude_keywords': ['f10', 'g30', 'touring', 'estate',
+                             'auto', 'automatic', 'steptronic', 'tiptronic',
+                             'non runner', 'spares', 'breaking']
+    },
+    'bmw_f30_330d': {
+        'search_terms': ['BMW 330d manual', 'F30 330d manual', 'BMW 330d 6 speed'],
+        'make': 'BMW', 'model': '3 Series',
+        'max_price': 15000, 'max_mileage': 120000,
+        'ni_markup': 3000,
+        'min_profit': 1000,
+        'avg_uk_price': 10000,
+        'avg_ni_price': 13000,
+        'year_min': 2012, 'year_max': 2019,
+        'require_keywords': ['330d', '330 d'],
+        'exclude_keywords': ['e46', 'e90', 'g20', 'touring', 'estate',
+                             'auto', 'automatic', 'steptronic', 'xdrive',
+                             'non runner', 'spares', 'breaking']
+    },
+
+    # ── BMW E92 (Drift + Show) ───────────────────────────────────
+    'bmw_e92_335i': {
+        'search_terms': ['BMW 335i E92', 'E92 335i', 'BMW 335i coupe'],
+        'make': 'BMW', 'model': '3 Series',
+        'max_price': 14000, 'max_mileage': 120000,
+        'ni_markup': 3000,
+        'min_profit': 1000,
+        'avg_uk_price': 9000,
+        'avg_ni_price': 12000,
+        'year_min': 2006, 'year_max': 2013,
+        'require_keywords': ['335i', '335 i', 'e92'],
+        'exclude_keywords': ['f30', 'g20', 'touring', 'estate', 'gran turismo',
+                             'auto', 'automatic', 'steptronic', 'dct',
+                             'non runner', 'spares', 'breaking']
+    },
+
+    # ── HONDA (JDM Icons) ───────────────────────────────────────
+    'honda_civic_ep3_type_r': {
+        'search_terms': ['Honda Civic Type R EP3', 'Civic EP3 Type R', 'EP3 Type R', 'Honda Civic Type R'],
+        'make': 'Honda', 'model': 'Civic',
+        'max_price': 10000, 'max_mileage': 140000,
+        'ni_markup': 3000,
+        'min_profit': 1000,
+        'avg_uk_price': 6000,
+        'avg_ni_price': 9000,
+        'year_min': 2001, 'year_max': 2005,
+        'exclude_keywords': ['fn2', 'fk2', 'fk8', 'fl5', '2006', '2007', '2008', '2009', '2010', '2011',
+                             'auto', 'automatic', 'non runner', 'spares', 'breaking']
+    },
+    'honda_civic_ek_vti': {
+        'search_terms': ['Honda Civic VTi', 'Civic EK4', 'Honda Civic EK', 'Civic SiR'],
+        'make': 'Honda', 'model': 'Civic',
+        'max_price': 7000, 'max_mileage': 150000,
+        'ni_markup': 2500,
+        'min_profit': 1000,
+        'avg_uk_price': 3500,
+        'avg_ni_price': 6000,
+        'year_min': 1996, 'year_max': 2000,
+        'require_keywords': ['vti', 'ek4', 'ek9', 'sir', 'b16', 'type r', 'ek'],
+        'exclude_keywords': ['ep3', 'fn2', 'fk', 'auto', 'automatic',
+                             'non runner', 'spares', 'breaking']
+    },
+    'honda_integra_dc2': {
+        'search_terms': ['Honda Integra Type R', 'Integra DC2', 'DC2 Type R', 'Honda Integra'],
+        'make': 'Honda', 'model': 'Integra',
+        'max_price': 18000, 'max_mileage': 130000,
+        'ni_markup': 4000,
+        'min_profit': 1000,
+        'avg_uk_price': 12000,
+        'avg_ni_price': 16000,
+        'require_keywords': ['type r', 'type-r', 'dc2'],
+        'exclude_keywords': ['dc5', 'auto', 'automatic',
+                             'non runner', 'spares', 'breaking']
+    },
+
+    # ── JAPANESE PERFORMANCE (NI Rally/Drift) ────────────────────
+    'mitsubishi_evo': {
+        'search_terms': ['Mitsubishi Evo', 'Mitsubishi Lancer Evolution', 'Evo 6', 'Evo 7', 'Evo 8', 'Evo 9'],
+        'make': 'Mitsubishi', 'model': 'Lancer',
+        'max_price': 18000, 'max_mileage': 100000,
+        'ni_markup': 4000,
+        'min_profit': 1000,
+        'avg_uk_price': 12000,
+        'avg_ni_price': 16000,
+        'require_keywords': ['evo', 'evolution'],
+        'exclude_keywords': ['evo x', 'evo 10', 'fq-440', 'auto', 'automatic', 'sst', 'tc-sst',
+                             'non runner', 'spares', 'breaking']
+    },
+    'subaru_impreza_wrx': {
+        'search_terms': ['Subaru Impreza WRX', 'Subaru WRX STI', 'Impreza WRX', 'Impreza Turbo'],
+        'make': 'Subaru', 'model': 'Impreza',
+        'max_price': 12000, 'max_mileage': 120000,
+        'ni_markup': 3000,
+        'min_profit': 1000,
+        'avg_uk_price': 7500,
+        'avg_ni_price': 10500,
+        'require_keywords': ['wrx', 'sti', 'turbo'],
+        'exclude_keywords': ['auto', 'automatic', 'cvt', 'lineartronic',
+                             'non runner', 'spares', 'breaking']
+    },
+    'toyota_starlet_glanza': {
+        'search_terms': ['Toyota Starlet Glanza', 'Starlet GT Turbo', 'Toyota Glanza V', 'EP91 Glanza'],
+        'make': 'Toyota', 'model': 'Starlet',
+        'max_price': 6000, 'max_mileage': 130000,
+        'ni_markup': 3000,
+        'min_profit': 1000,
+        'avg_uk_price': 3500,
+        'avg_ni_price': 6500,
+        'require_keywords': ['glanza', 'gt turbo', 'gt-turbo'],
+        'exclude_keywords': ['auto', 'automatic',
+                             'non runner', 'spares', 'breaking', 'shell']
+    },
+    'nissan_200sx_s14_s15': {
+        'search_terms': ['Nissan 200SX', 'Nissan Silvia S14', 'Nissan Silvia S15', 'Nissan 200SX S14'],
+        'make': 'Nissan', 'model': '200SX',
+        'max_price': 12000, 'max_mileage': 130000,
+        'ni_markup': 3500,
+        'min_profit': 1000,
+        'avg_uk_price': 7500,
+        'avg_ni_price': 11000,
+        'require_keywords': ['200sx', 'silvia', 's14', 's15'],
+        'exclude_keywords': ['auto', 'automatic',
+                             'non runner', 'spares', 'breaking', 'shell']
+    },
+    'nissan_skyline_r33': {
+        'search_terms': ['Nissan Skyline R33', 'Skyline GTS-T', 'R33 GTR', 'Skyline R33'],
+        'make': 'Nissan', 'model': 'Skyline',
+        'max_price': 18000, 'max_mileage': 110000,
+        'ni_markup': 4000,
+        'min_profit': 1000,
+        'avg_uk_price': 12000,
+        'avg_ni_price': 16000,
+        'require_keywords': ['skyline', 'r33', 'gts-t', 'gtr', 'gt-r'],
+        'exclude_keywords': ['auto', 'automatic',
+                             'non runner', 'spares', 'breaking', 'shell', 'project']
+    },
+    'nissan_350z': {
+        'search_terms': ['Nissan 350Z', '350Z GT', 'Nissan 350 Z'],
+        'make': 'Nissan', 'model': '350Z',
+        'max_price': 9000, 'max_mileage': 110000,
+        'ni_markup': 2500,
+        'min_profit': 1000,
+        'avg_uk_price': 5500,
+        'avg_ni_price': 8000,
+        'exclude_keywords': ['370z', 'auto', 'automatic',
+                             'non runner', 'spares', 'breaking', 'cat d', 'cat s', 'cat n']
+    },
+
+    # ── ROADSTERS & MID-ENGINE ───────────────────────────────────
+    'mazda_mx5_na_nb': {
+        'search_terms': ['Mazda MX-5', 'Mazda MX5', 'MX-5 1.8', 'Mazda Eunos'],
+        'make': 'Mazda', 'model': 'MX-5',
+        'max_price': 6000, 'max_mileage': 120000,
+        'ni_markup': 2000,
+        'min_profit': 1000,
+        'avg_uk_price': 3000,
+        'avg_ni_price': 5000,
+        'year_min': 1989, 'year_max': 2005,
+        'exclude_keywords': ['nc', 'nd', 'rf', '2006', '2007', '2008', '2009', '2010', '2011', '2012',
+                             'auto', 'automatic',
+                             'non runner', 'spares', 'breaking']
+    },
+    'toyota_mr2_sw20': {
+        'search_terms': ['Toyota MR2 Turbo', 'MR2 SW20', 'Toyota MR2 GT', 'MR2 Rev3'],
+        'make': 'Toyota', 'model': 'MR2',
+        'max_price': 8000, 'max_mileage': 120000,
+        'ni_markup': 2500,
+        'min_profit': 1000,
+        'avg_uk_price': 5000,
+        'avg_ni_price': 7500,
+        'year_min': 1989, 'year_max': 1999,
+        'require_keywords': ['turbo', 'gt', 'sw20', 'rev', 'mr2'],
+        'exclude_keywords': ['mk1', 'aw11', 'mk3', 'zzw30', 'roadster',
+                             'auto', 'automatic',
+                             'non runner', 'spares', 'breaking']
+    },
+
+    # ── FORD CLASSICS (NI Heritage) ──────────────────────────────
+    'ford_sierra_cosworth': {
+        'search_terms': ['Ford Sierra Cosworth', 'Sierra Sapphire Cosworth', 'Sierra RS Cosworth'],
+        'make': 'Ford', 'model': 'Sierra',
+        'max_price': 40000, 'max_mileage': 100000,
+        'ni_markup': 5000,
+        'min_profit': 1000,
+        'avg_uk_price': 28000,
+        'avg_ni_price': 33000,
+        'require_keywords': ['cosworth', 'cossie', 'rs cosworth'],
+        'exclude_keywords': ['replica', 'kit',
+                             'auto', 'automatic',
+                             'non runner', 'spares', 'project']
+    },
+    'ford_escort_rs_turbo': {
+        'search_terms': ['Ford Escort RS Turbo', 'Escort RS Turbo', 'Ford Escort RST'],
+        'make': 'Ford', 'model': 'Escort',
+        'max_price': 22000, 'max_mileage': 90000,
+        'ni_markup': 3500,
+        'min_profit': 1000,
+        'avg_uk_price': 14000,
+        'avg_ni_price': 17500,
         'require_keywords': ['rs turbo', 'rst', 'rs-turbo'],
-        'exclude_keywords': ['replica', 'kit', 'non runner', 'spares', 'project']
+        'exclude_keywords': ['replica', 'kit',
+                             'auto', 'automatic',
+                             'non runner', 'spares', 'project']
+    },
+    'ford_escort_mk2': {
+        'search_terms': ['Ford Escort Mk2', 'Ford Escort Mark 2', 'Escort Mk2 RS', 'Escort MK II'],
+        'make': 'Ford', 'model': 'Escort',
+        'max_price': 30000, 'max_mileage': 80000,
+        'ni_markup': 5000,
+        'min_profit': 1000,
+        'avg_uk_price': 18000,
+        'avg_ni_price': 23000,
+        'require_keywords': ['mk2', 'mk 2', 'mark 2', 'mark ii', 'mkii'],
+        'exclude_keywords': ['replica', 'kit', 'mk1', 'mk3', 'mk4', 'mk5', 'rs turbo',
+                             'auto', 'automatic',
+                             'non runner', 'spares', 'project', 'shell']
+    },
+
+    # ── VW/VAG (NI Modified Scene) ───────────────────────────────
+    'vw_golf_gti_mk2': {
+        'search_terms': ['VW Golf GTI Mk2', 'Golf GTI Mark 2', 'Golf GTI 16v Mk2', 'Volkswagen Golf GTI Mk2'],
+        'make': 'Volkswagen', 'model': 'Golf',
+        'max_price': 15000, 'max_mileage': 120000,
+        'ni_markup': 3000,
+        'min_profit': 1000,
+        'avg_uk_price': 9000,
+        'avg_ni_price': 12000,
+        'year_min': 1983, 'year_max': 1992,
+        'require_keywords': ['gti', 'mk2', 'mk 2', 'mark 2', '16v'],
+        'exclude_keywords': ['mk1', 'mk3', 'mk4', 'mk5', 'mk6', 'mk7', 'mk8',
+                             'auto', 'automatic',
+                             'non runner', 'spares', 'breaking', 'project']
     }
 }
 
@@ -258,24 +428,32 @@ TARGET_CARS = {
 MODEL_IMAGES = {
     'peugeot_306_dturbo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Peugeot_306_front_20080822.jpg/640px-Peugeot_306_front_20080822.jpg',
     'lexus_is200_sport': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg/640px-1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg',
-    'bmw_e46_330ci': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/BMW_E46_Coup%C3%A9_front_20080111.jpg/640px-BMW_E46_Coup%C3%A9_front_20080111.jpg',
     'lexus_is250_sport': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg/640px-1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg',
+    'bmw_e46_330ci': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/BMW_E46_Coup%C3%A9_front_20080111.jpg/640px-BMW_E46_Coup%C3%A9_front_20080111.jpg',
     'bmw_e46_m3': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/BMW_M3_E46_%282%29.jpg/640px-BMW_M3_E46_%282%29.jpg',
-    'honda_civic_ep3_type_r': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Honda_Civic_Type_R_%28EP3%29.jpg/640px-Honda_Civic_Type_R_%28EP3%29.jpg',
+    'bmw_e36_328i': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/BMW_E36_328i_Coup%C3%A9.jpg/640px-BMW_E36_328i_Coup%C3%A9.jpg',
+    'bmw_e36_325i': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/BMW_E36_328i_Coup%C3%A9.jpg/640px-BMW_E36_328i_Coup%C3%A9.jpg',
+    'bmw_e36_m3': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/BMW_M3_%28E36%29_%E2%80%93_Frontansicht%2C_24._Juni_2012%2C_D%C3%BCsseldorf.jpg/640px-BMW_M3_%28E36%29_%E2%80%93_Frontansicht%2C_24._Juni_2012%2C_D%C3%BCsseldorf.jpg',
+    'bmw_e30_325i': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/BMW_E30_front_20081128.jpg/640px-BMW_E30_front_20081128.jpg',
     'bmw_e60_530d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/BMW_E60_front_20080417.jpg/640px-BMW_E60_front_20080417.jpg',
     'bmw_e60_535d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/BMW_E60_front_20080417.jpg/640px-BMW_E60_front_20080417.jpg',
     'bmw_f30_330d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/BMW_F30_320d_Sportline_Mineralgrau.jpg/640px-BMW_F30_320d_Sportline_Mineralgrau.jpg',
-    'bmw_f30_335d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/BMW_F30_320d_Sportline_Mineralgrau.jpg/640px-BMW_F30_320d_Sportline_Mineralgrau.jpg',
+    'bmw_e92_335i': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/BMW_E92_front_20080524.jpg/640px-BMW_E92_front_20080524.jpg',
+    'honda_civic_ep3_type_r': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Honda_Civic_Type_R_%28EP3%29.jpg/640px-Honda_Civic_Type_R_%28EP3%29.jpg',
+    'honda_civic_ek_vti': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Honda_Civic_%28sixth_generation%29_%28front%29%2C_Serdang.jpg/640px-Honda_Civic_%28sixth_generation%29_%28front%29%2C_Serdang.jpg',
+    'honda_integra_dc2': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/1999-2001_Honda_Integra_Type_R.jpg/640px-1999-2001_Honda_Integra_Type_R.jpg',
     'mitsubishi_evo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Mitsubishi_Lancer_Evolution_VII.jpg/640px-Mitsubishi_Lancer_Evolution_VII.jpg',
     'subaru_impreza_wrx': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Subaru_Impreza_WRX_STI_%28GDB%29.jpg/640px-Subaru_Impreza_WRX_STI_%28GDB%29.jpg',
     'toyota_starlet_glanza': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Toyota_Starlet_1.3_GL_%28EP91%29.jpg/640px-Toyota_Starlet_1.3_GL_%28EP91%29.jpg',
-    'honda_integra_dc2': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/1999-2001_Honda_Integra_Type_R.jpg/640px-1999-2001_Honda_Integra_Type_R.jpg',
     'nissan_200sx_s14_s15': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Nissan_200SX_%28S14%29.jpg/640px-Nissan_200SX_%28S14%29.jpg',
+    'nissan_skyline_r33': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b6/Nissan_Skyline_R33_GT-R_01.jpg/640px-Nissan_Skyline_R33_GT-R_01.jpg',
     'nissan_350z': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Nissan_350Z_--_09-07-2009.jpg/640px-Nissan_350Z_--_09-07-2009.jpg',
     'mazda_mx5_na_nb': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Mazda_MX-5_%28NA%29.jpg/640px-Mazda_MX-5_%28NA%29.jpg',
     'toyota_mr2_sw20': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Toyota_MR2_%28SW20%29.jpg/640px-Toyota_MR2_%28SW20%29.jpg',
     'ford_sierra_cosworth': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Ford_Sierra_RS_Cosworth.jpg/640px-Ford_Sierra_RS_Cosworth.jpg',
     'ford_escort_rs_turbo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Ford_Escort_RS_Turbo_%2814433268513%29.jpg/640px-Ford_Escort_RS_Turbo_%2814433268513%29.jpg',
+    'ford_escort_mk2': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Ford_Escort_MkII_-_1977.jpg/640px-Ford_Escort_MkII_-_1977.jpg',
+    'vw_golf_gti_mk2': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/68/VW_Golf_II_GTI.jpg/640px-VW_Golf_II_GTI.jpg',
 }
 
 # Headers to mimic a real browser (Linux-compatible)
@@ -445,6 +623,16 @@ class CarListing:
             except (AttributeError, ValueError, TypeError):
                 pass  # If year can't be parsed, allow it through
 
+        # Check mileage cap if specified
+        max_mileage = car_config.get('max_mileage')
+        if max_mileage and self.mileage and self.mileage != 'Unknown':
+            try:
+                mileage_val = int(re.sub(r'[,\s]', '', str(self.mileage)))
+                if mileage_val > max_mileage:
+                    return False
+            except (ValueError, TypeError):
+                pass  # If mileage can't be parsed, allow it through
+
         return (
             self.price > 0 and
             self.price <= car_config.get('max_price', 999999) and
@@ -558,25 +746,33 @@ class AutoTraderScraper:
         """Get keyword filter for specific sub-models"""
         keywords = {
             'peugeot_306_dturbo': 'd turbo',
-            'lexus_is200_sport': 'IS200 sport',
-            'lexus_is250_sport': 'IS250 sport',
+            'lexus_is200_sport': 'IS200',
+            'lexus_is250_sport': 'IS250',
             'bmw_e46_330ci': '330ci',
             'bmw_e46_m3': 'M3',
+            'bmw_e36_328i': '328i',
+            'bmw_e36_325i': '325i',
+            'bmw_e36_m3': 'M3 E36',
+            'bmw_e30_325i': '325i E30',
             'bmw_e60_530d': '530d',
             'bmw_e60_535d': '535d',
             'bmw_f30_330d': '330d',
-            'bmw_f30_335d': '335d',
+            'bmw_e92_335i': '335i',
             'honda_civic_ep3_type_r': 'type r',
+            'honda_civic_ek_vti': 'VTi',
+            'honda_integra_dc2': 'type r',
             'mitsubishi_evo': 'evolution',
             'subaru_impreza_wrx': 'WRX',
             'toyota_starlet_glanza': 'glanza',
-            'honda_integra_dc2': 'type r',
             'nissan_200sx_s14_s15': '200sx',
+            'nissan_skyline_r33': 'skyline',
             'nissan_350z': '350z',
             'mazda_mx5_na_nb': 'MX-5',
             'toyota_mr2_sw20': 'MR2 turbo',
             'ford_sierra_cosworth': 'cosworth',
             'ford_escort_rs_turbo': 'rs turbo',
+            'ford_escort_mk2': 'escort mk2',
+            'vw_golf_gti_mk2': 'GTI',
         }
         return keywords.get(model_type, '')
 
@@ -833,10 +1029,158 @@ class AutoTraderScraper:
         return listings
 
 
+class EbayMotorsScraper:
+    """Scraper for eBay Motors UK - reliable server-rendered listings"""
+
+    BASE_URL = "https://www.ebay.co.uk"
+
+    def search(self, model_type: str, search_term: str) -> List[CarListing]:
+        """Search eBay Motors UK for used cars"""
+        listings = []
+        config = TARGET_CARS[model_type]
+
+        print(f"  → eBay Motors: {search_term}")
+
+        try:
+            # eBay UK Cars category = 9801, LH_ItemCondition=3000 = Used
+            params = {
+                '_nkw': search_term,
+                '_udlo': '200',  # Min price £200 to skip scam listings
+                '_udhi': str(config['max_price']),
+                'LH_ItemCondition': '3000',
+                '_sop': '2',  # Sort by price: lowest first
+            }
+            search_url = f"{self.BASE_URL}/sch/Cars/9801/i.html?{urlencode(params)}"
+            response = requests.get(search_url, headers=HEADERS, timeout=20)
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            # Find the search results list
+            srp_list = soup.find('ul', class_=re.compile(r'srp-results'))
+            if not srp_list:
+                print(f"     - No results container found")
+                return listings
+
+            items = srp_list.find_all('li', recursive=False)
+
+            for item in items[:20]:
+                try:
+                    # Skip non-listing items (ads, headers)
+                    classes = ' '.join(item.get('class', []))
+                    if 's-card' not in classes:
+                        continue
+
+                    text = item.get_text(separator=' | ')
+
+                    # Extract price from s-card__price span
+                    price_span = item.find('span', class_=re.compile(r's-card__price'))
+                    if not price_span:
+                        price_match = re.search(r'£([\d,]+(?:\.\d{2})?)', text)
+                        if not price_match:
+                            continue
+                        price = extract_price(f"£{price_match.group(1)}")
+                    else:
+                        price = extract_price(price_span.get_text(strip=True))
+                    if price <= 0 or price > config['max_price']:
+                        continue
+
+                    # Extract title from img alt or first primary span
+                    title = 'eBay Listing'
+                    url = ''
+                    img_el = item.find('img')
+                    if img_el and img_el.get('alt', '').strip():
+                        title = img_el['alt'].strip()
+
+                    # If img alt didn't work, try first styled-text primary span
+                    if title == 'eBay Listing':
+                        for span in item.find_all('span', class_=re.compile(r'su-styled-text')):
+                            span_classes = span.get('class', [])
+                            if 'primary' in span_classes and 'bold' not in span_classes:
+                                span_text = span.get_text(strip=True)
+                                if span_text and len(span_text) > 10 and '£' not in span_text:
+                                    title = span_text
+                                    break
+
+                    # Extract URL from first link
+                    first_link = item.find('a', href=True)
+                    if first_link:
+                        url = first_link.get('href', '')
+
+                    # Clean URL (remove tracking params)
+                    if '?' in url:
+                        url = url.split('?')[0]
+
+                    # Extract year from title
+                    year_match = re.search(r'(19|20)\d{2}', title)
+                    year = year_match.group() if year_match else 'Unknown'
+
+                    # Extract mileage - eBay uses "Miles: 101,000" format
+                    mileage = 'Unknown'
+                    mileage_match = re.search(r'Miles:\s*([\d,]+)', text)
+                    if mileage_match:
+                        mileage = mileage_match.group(1)
+                    else:
+                        mileage_match2 = re.search(r'([\d,]+)\s*(?:miles|mi)\b', text, re.IGNORECASE)
+                        if mileage_match2:
+                            mileage = mileage_match2.group(1)
+
+                    # Extract image
+                    image = ''
+                    if img_el:
+                        image = img_el.get('src', '') or img_el.get('data-src', '')
+                        if image and ('gif' in image or 'spacer' in image or image.startswith('data:')):
+                            image = ''
+
+                    # Extract location if available
+                    location = 'Unknown'
+                    loc_match = re.search(r'from\s+([\w\s,]+?)(?:\s*\||$)', text)
+                    if loc_match:
+                        location = loc_match.group(1).strip()
+
+                    listings.append(CarListing({
+                        'model_type': model_type,
+                        'title': title[:100],
+                        'price': price,
+                        'location': location,
+                        'coords': geocode_location(location),
+                        'url': url,
+                        'year': year,
+                        'mileage': mileage,
+                        'source': 'eBay Motors',
+                        'image': image
+                    }))
+                except Exception:
+                    continue
+
+            if listings:
+                print(f"     ✓ Found {len(listings)} from eBay Motors")
+            else:
+                print(f"     - No matching results")
+
+        except requests.RequestException as e:
+            print(f"     ✗ Request failed: {str(e)[:80]}")
+        except Exception as e:
+            print(f"     ✗ Error: {str(e)[:80]}")
+
+        return listings
+
+
 class GumtreeScraper:
-    """Scraper for Gumtree UK"""
+    """Scraper for Gumtree UK - uses cloudscraper to bypass bot protection"""
 
     BASE_URL = "https://www.gumtree.com"
+
+    def __init__(self):
+        """Initialize with cloudscraper session if available"""
+        self._scraper = None
+        try:
+            import cloudscraper
+            self._scraper = cloudscraper.create_scraper(
+                browser={'browser': 'chrome', 'platform': 'windows', 'mobile': False}
+            )
+        except ImportError:
+            pass  # Fall back to requests
 
     def search(self, model_type: str, search_term: str) -> List[CarListing]:
         """Search Gumtree for cars"""
@@ -856,7 +1200,15 @@ class GumtreeScraper:
                 'vehicle_type': 'cars',
             }
 
-            response = requests.get(search_url, params=params, headers=HEADERS, timeout=20, allow_redirects=True)
+            # Use cloudscraper if available to bypass Radware bot protection
+            http_client = self._scraper if self._scraper else requests
+            response = http_client.get(search_url, params=params, headers=HEADERS, timeout=30, allow_redirects=True)
+
+            # Check for bot protection (status 247 = Radware challenge)
+            if response.status_code == 247 or len(response.text) < 1000:
+                print(f"     - Bot protection active (status {response.status_code})")
+                return listings
+
             response.raise_for_status()
 
             html = response.text
@@ -947,8 +1299,15 @@ class GumtreeScraper:
             if elements:
                 for el in elements[:15]:
                     try:
-                        title_el = el.find(['h2', 'h3', 'a'])
+                        # Get title - prefer h2/h3, clean leading junk digits
+                        title_el = el.find(['h2', 'h3'])
+                        if not title_el:
+                            title_el = el.find('a', href=re.compile(r'/cars-vans-motorbikes|/p/'))
                         title = title_el.get_text(strip=True) if title_el else search_term
+                        # Strip leading junk digits (view counts, days ago, etc.) before car name
+                        # Handles: "20BMW...", "602004 BMW...", "122004 BMW..."
+                        title = re.sub(r'^\d{1,4}(?=(19|20)\d{2}\s)', '', title).strip()
+                        title = re.sub(r'^\d{1,3}(?=[A-Z])', '', title).strip()
 
                         price_text = el.find(string=re.compile(r'£[\d,]+'))
                         price = extract_price(price_text) if price_text else 0
@@ -962,9 +1321,10 @@ class GumtreeScraper:
                             if not url.startswith('http'):
                                 url = f"{self.BASE_URL}{url}"
 
-                        text = el.get_text()
-                        year_match = re.search(r'(19|20)\d{2}', text)
-                        mileage_match = re.search(r'([\d,]+)\s*(miles|mi)', text, re.IGNORECASE)
+                        text = el.get_text(separator=' ')
+                        year_match = re.search(r'\b(19|20)\d{2}\b', text)
+                        # Use word boundary to avoid matching year+mileage concatenated
+                        mileage_match = re.search(r'\b([\d,]{3,7})\s*(?:miles|mi)\b', text, re.IGNORECASE)
 
                         image = ''
                         img_el = el.find('img')
@@ -1000,58 +1360,94 @@ class GumtreeScraper:
 
 
 class PistonHeadsScraper:
-    """Scraper for PistonHeads classifieds - browses /buy/{make} to get Apollo state adverts"""
+    """Scraper for PistonHeads classifieds - uses model-specific URLs for targeted results"""
 
     BASE_URL = "https://www.pistonheads.com"
 
-    # Map our make names to PistonHeads URL slugs
-    MAKE_SLUGS = {
-        'Peugeot': 'peugeot',
-        'Lexus': 'lexus',
-        'BMW': 'bmw',
-        'Honda': 'honda',
-        'Mitsubishi': 'mitsubishi',
-        'Subaru': 'subaru',
-        'Toyota': 'toyota',
-        'Nissan': 'nissan',
-        'Mazda': 'mazda',
-        'Ford': 'ford',
+    # Map each target car to its PistonHeads model-specific URL path(s)
+    # Discovered from Apollo state Model.classifiedsLandingPageUrl
+    # Multiple URLs for models that span PH categories (e.g. Evo IV-VI + VII-IX)
+    MODEL_URLS = {
+        'peugeot_306_dturbo': ['/buy/peugeot/306'],
+        'lexus_is200_sport': ['/buy/lexus/is'],
+        'lexus_is250_sport': ['/buy/lexus/is'],
+        'bmw_e46_330ci': ['/buy/bmw/e46-3-series-98-06'],
+        'bmw_e46_m3': ['/buy/bmw/e46-m3-00-06'],
+        'bmw_e36_328i': ['/buy/bmw/e36-3-series-91-99'],
+        'bmw_e36_325i': ['/buy/bmw/e36-3-series-91-99'],
+        'bmw_e36_m3': ['/buy/bmw/e36-m3-92-99'],
+        'bmw_e30_325i': ['/buy/bmw/e30-3-series-82-94'],
+        'bmw_e60_530d': ['/buy/bmw/e60-5-series-03-10'],
+        'bmw_e60_535d': ['/buy/bmw/e60-5-series-03-10'],
+        'bmw_f30_330d': ['/buy/bmw/f30-3-series-post-12'],
+        'bmw_e92_335i': ['/buy/bmw/e90-3-series-05-12'],
+        'honda_civic_ep3_type_r': ['/buy/honda/civic-type-r'],
+        'honda_civic_ek_vti': ['/buy/honda/civic'],
+        'honda_integra_dc2': ['/buy/honda/integra'],
+        'mitsubishi_evo': ['/buy/mitsubishi/evo-iv-vi', '/buy/mitsubishi/evo-vii-ix', '/buy/mitsubishi/evo-x'],
+        'subaru_impreza_wrx': ['/buy/subaru/impreza-wrx', '/buy/subaru/impreza-sti'],
+        'toyota_starlet_glanza': [],  # Not listed on PH
+        'nissan_200sx_s14_s15': ['/buy/nissan/200-200sx-silvia'],
+        'nissan_skyline_r33': ['/buy/nissan/skyline-r33'],
+        'nissan_350z': ['/buy/nissan/350z'],
+        'mazda_mx5_na_nb': ['/buy/mazda/mx-5-mk1', '/buy/mazda/mx-5-mk2'],
+        'toyota_mr2_sw20': [],  # Not listed on PH
+        'ford_sierra_cosworth': [],  # Not listed on PH
+        'ford_escort_rs_turbo': ['/buy/ford/escort'],
+        'ford_escort_mk2': ['/buy/ford/escort'],
+        'vw_golf_gti_mk2': [],  # Historic model, not listed on PH
     }
 
     def search(self, model_type: str, search_term: str) -> List[CarListing]:
-        """Search PistonHeads by browsing /buy/{make} and filtering Apollo state adverts"""
+        """Search PistonHeads using model-specific URLs for targeted results"""
         listings = []
         config = TARGET_CARS[model_type]
 
         print(f"  → PistonHeads: {search_term}")
 
+        model_urls = self.MODEL_URLS.get(model_type, [])
+        if not model_urls:
+            print(f"     - No PistonHeads listing page for this model")
+            return listings
+
         try:
-            make = config.get('make', '')
-            make_slug = self.MAKE_SLUGS.get(make, make.lower())
+            for url_path in model_urls:
+                search_url = f"{self.BASE_URL}{url_path}"
+                response = requests.get(search_url, headers=HEADERS, timeout=20, allow_redirects=True)
+                response.raise_for_status()
 
-            # Browse the make-specific page to get real adverts in Apollo state
-            search_url = f"{self.BASE_URL}/buy/{make_slug}"
-            response = requests.get(search_url, headers=HEADERS, timeout=20, allow_redirects=True)
-            response.raise_for_status()
+                html = response.text
 
-            html = response.text
+                # Method 1: Extract Apollo state from __NEXT_DATA__
+                apollo_state = self._extract_apollo_state(html)
+                if apollo_state:
+                    page_listings = self._parse_apollo_adverts(apollo_state, model_type, config)
+                    listings.extend(page_listings)
 
-            # Method 1: Extract Apollo state from __NEXT_DATA__
-            apollo_state = self._extract_apollo_state(html)
-            if apollo_state:
-                listings = self._parse_apollo_adverts(apollo_state, model_type, config)
-                if listings:
-                    print(f"     ✓ Found {len(listings)} from Apollo state")
-                    return listings
+                # Method 2: Parse server-rendered MUI Card HTML
+                if not listings:
+                    soup = BeautifulSoup(html, 'html.parser')
+                    page_listings = self._parse_mui_cards(soup, model_type, search_term, config)
+                    listings.extend(page_listings)
 
-            # Method 2: Parse server-rendered MUI Card HTML
-            soup = BeautifulSoup(html, 'html.parser')
-            listings = self._parse_mui_cards(soup, model_type, search_term, config)
+                # Brief delay between PH pages
+                if len(model_urls) > 1:
+                    time.sleep(random.uniform(0.5, 1.0))
+
             if listings:
-                print(f"     ✓ Found {len(listings)} from HTML")
-                return listings
-
-            print(f"     - No matching results (page: {len(html)} bytes)")
+                # Deduplicate by URL
+                seen = set()
+                unique = []
+                for l in listings:
+                    if l.url and l.url not in seen:
+                        seen.add(l.url)
+                        unique.append(l)
+                    elif not l.url:
+                        unique.append(l)
+                listings = unique
+                print(f"     ✓ Found {len(listings)} from PistonHeads")
+            else:
+                print(f"     - No matching results")
 
         except requests.RequestException as e:
             print(f"     ✗ Request failed: {str(e)[:80]}")
@@ -1088,21 +1484,29 @@ class PistonHeadsScraper:
             'lexus_is250_sport': ['is250', 'is 250', 'is-250'],
             'bmw_e46_330ci': ['330ci', '330 ci', '330 coupe'],
             'bmw_e46_m3': ['m3'],
-            'honda_civic_ep3_type_r': ['civic', 'type r', 'type-r'],
+            'bmw_e36_328i': ['328i', '328'],
+            'bmw_e36_325i': ['325i', 'e36'],
+            'bmw_e36_m3': ['m3', 'e36'],
+            'bmw_e30_325i': ['e30', '325'],
             'bmw_e60_530d': ['530d', '530'],
             'bmw_e60_535d': ['535d', '535'],
             'bmw_f30_330d': ['330d'],
-            'bmw_f30_335d': ['335d'],
+            'bmw_e92_335i': ['335i', 'e92'],
+            'honda_civic_ep3_type_r': ['civic', 'type r', 'type-r'],
+            'honda_civic_ek_vti': ['civic', 'vti', 'ek4', 'ek9'],
+            'honda_integra_dc2': ['integra', 'dc2', 'type r'],
             'mitsubishi_evo': ['evo', 'evolution'],
             'subaru_impreza_wrx': ['wrx', 'sti', 'impreza'],
             'toyota_starlet_glanza': ['glanza', 'starlet', 'gt turbo'],
-            'honda_integra_dc2': ['integra', 'dc2', 'type r'],
             'nissan_200sx_s14_s15': ['200sx', 'silvia', 's14', 's15'],
+            'nissan_skyline_r33': ['skyline', 'r33', 'gts-t'],
             'nissan_350z': ['350z'],
             'mazda_mx5_na_nb': ['mx-5', 'mx5', 'miata', 'eunos'],
             'toyota_mr2_sw20': ['mr2'],
             'ford_sierra_cosworth': ['sierra', 'cosworth'],
             'ford_escort_rs_turbo': ['escort', 'rs turbo'],
+            'ford_escort_mk2': ['escort', 'mk2', 'mark 2'],
+            'vw_golf_gti_mk2': ['golf', 'gti'],
         }
         keywords = model_keywords.get(model_type, [model_name])
         max_price = config.get('max_price', 999999)
@@ -1183,21 +1587,29 @@ class PistonHeadsScraper:
             'lexus_is250_sport': ['is250', 'is 250', 'is-250'],
             'bmw_e46_330ci': ['330ci', '330 ci', '330 coupe', 'e46'],
             'bmw_e46_m3': ['m3', 'e46'],
-            'honda_civic_ep3_type_r': ['civic', 'type r', 'type-r'],
+            'bmw_e36_328i': ['328i', '328', 'e36'],
+            'bmw_e36_325i': ['325i', 'e36'],
+            'bmw_e36_m3': ['m3', 'e36'],
+            'bmw_e30_325i': ['e30', '325'],
             'bmw_e60_530d': ['530d', '530 '],
             'bmw_e60_535d': ['535d', '535 '],
             'bmw_f30_330d': ['330d'],
-            'bmw_f30_335d': ['335d'],
+            'bmw_e92_335i': ['335i', 'e92'],
+            'honda_civic_ep3_type_r': ['civic', 'type r', 'type-r'],
+            'honda_civic_ek_vti': ['civic', 'vti', 'ek4', 'ek9'],
+            'honda_integra_dc2': ['integra', 'dc2', 'type r'],
             'mitsubishi_evo': ['evo', 'evolution'],
             'subaru_impreza_wrx': ['wrx', 'sti', 'impreza'],
             'toyota_starlet_glanza': ['glanza', 'starlet', 'gt turbo'],
-            'honda_integra_dc2': ['integra', 'dc2', 'type r'],
             'nissan_200sx_s14_s15': ['200sx', 'silvia', 's14', 's15'],
+            'nissan_skyline_r33': ['skyline', 'r33', 'gts-t'],
             'nissan_350z': ['350z'],
             'mazda_mx5_na_nb': ['mx-5', 'mx5', 'miata', 'eunos'],
             'toyota_mr2_sw20': ['mr2'],
             'ford_sierra_cosworth': ['sierra', 'cosworth'],
             'ford_escort_rs_turbo': ['escort', 'rs turbo'],
+            'ford_escort_mk2': ['escort', 'mk2', 'mark 2'],
+            'vw_golf_gti_mk2': ['golf', 'gti'],
         }
         keywords = model_keywords.get(model_type, [config.get('model', '').lower()])
         max_price = config.get('max_price', 999999)
@@ -1290,9 +1702,9 @@ class CarArbitrageFinder:
 
     def __init__(self, progress_callback=None):
         self.scrapers = [
-            AutoTraderScraper(),
+            EbayMotorsScraper(),
+            PistonHeadsScraper(),
             GumtreeScraper(),
-            PistonHeadsScraper()
         ]
         self.all_listings = []
         self.profitable_deals = []
@@ -1323,15 +1735,14 @@ class CarArbitrageFinder:
 
             for scraper in self.scrapers:
                 try:
-                    scraper_name = scraper.__class__.__name__.replace('Scraper', '')
+                    scraper_name = scraper.__class__.__name__.replace('Scraper', '').replace('Motors', ' Motors')
 
                     self._log(f"📡 {scraper_name}: Searching '{search_term}'...")
 
                     listings = scraper.search(model_type, search_term)
 
-                    # For Gumtree (our most reliable source), try a 2nd search term
-                    # if the first returned few results, to maximize coverage
-                    if isinstance(scraper, GumtreeScraper) and len(listings) < 5 and len(config['search_terms']) > 1:
+                    # For eBay/Gumtree, try alternate search terms if few results
+                    if isinstance(scraper, (EbayMotorsScraper, GumtreeScraper)) and len(listings) < 5 and len(config['search_terms']) > 1:
                         time.sleep(random.uniform(1.0, 2.0))
                         alt_term = config['search_terms'][1]
                         self._log(f"📡 {scraper_name}: Trying alternate term '{alt_term}'...")
