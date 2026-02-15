@@ -434,16 +434,12 @@ def index():
                         <div class="deal-title">${deal.title}</div>
                         <div class="deal-info">
                             <div class="info-item">
-                                <span class="info-label">Buy Price (You Pay)</span>
+                                <span class="info-label">Buy Price</span>
                                 <span class="info-value">£${deal.price.toLocaleString()}</span>
                             </div>
                             <div class="info-item">
                                 <span class="info-label">Avg UK Price</span>
                                 <span class="info-value" style="color: #888;">£${deal.avg_uk_price.toLocaleString()}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">UK Saving</span>
-                                <span class="info-value" style="color: ${deal.uk_saving > 0 ? '#00ff88' : '#ff4444'};">£${deal.uk_saving.toLocaleString()}</span>
                             </div>
                             <div class="info-item">
                                 <span class="info-label">Sell Price (NI)</span>

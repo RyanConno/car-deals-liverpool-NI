@@ -21,109 +21,141 @@ import random
 
 # Configuration
 LIVERPOOL_COORDS = (53.4084, -2.9916)
-MAX_DISTANCE_MILES = 100
+MAX_DISTANCE_MILES = 200  # Expanded from 100 - covers Manchester, Birmingham, Leeds
 OUTPUT_DIR = "./car_deals"
-COSTS_PER_CAR = 550  # Ferry £200 (Liverpool-Belfast) + Fuel £80 + Insurance £200 + Admin £70
+# Updated costs for longer distances
+COSTS_PER_CAR = 650  # Ferry £200 + Fuel £100 (longer trips) + Insurance £250 + Admin £100
 
 # Target models with search terms and profit expectations
 # Updated February 2026 - Based on REAL UK market analysis
 # Research sources: AutoTrader UK, PistonHeads, ClassicValuer.com, DoneDeal.ie
 TARGET_CARS = {
+    # High Volume Opportunities - Lower margins but easier to find
     'bmw_e46_330': {
-        'search_terms': ['BMW 330i', 'BMW 330ci', 'E46 330'],
-        'max_price': 8000,       # Real market: £2,750-£9,750 (avg £5k-£6k)
-        'ni_markup': 1200,       # Realistic NI premium for clean examples
-        'min_profit': 500,       # Lowered to catch more deals
-        'avg_uk_price': 5500,    # Average England market price
-        'avg_ni_price': 6700     # Average NI market price
-    },
-    'bmw_e36_m3': {
-        'search_terms': ['BMW E36 M3', 'E36 M3 Evolution', 'E36 M3 3.2'],
-        'max_price': 20000,      # M3s are £12k-£28k, focus on lower end
-        'ni_markup': 3000,       # Good demand in NI drift scene
-        'min_profit': 1800,      # Realistic profit for high-value car
-        'avg_uk_price': 18000,   # Average England market price
-        'avg_ni_price': 21000    # Average NI market price
-    },
-    'bmw_e36_328': {
-        'search_terms': ['BMW E36 328i', 'E36 328i Sport'],
-        'max_price': 6000,       # Non-M3 E36s £3k-£8k range
-        'ni_markup': 1000,       # Moderate NI premium
-        'min_profit': 400,       # Entry-level profit acceptable
-        'avg_uk_price': 4500,    # Average England market price
-        'avg_ni_price': 5500     # Average NI market price
+        'search_terms': ['BMW 330i', 'BMW 330ci', 'E46 330', '330i Sport', '330ci M Sport'],
+        'max_price': 10000,      # Increased to catch more
+        'ni_markup': 1000,       # Conservative estimate
+        'min_profit': 200,       # Low barrier - any profit is good
+        'avg_uk_price': 5500,
+        'avg_ni_price': 6700
     },
     'lexus_is200': {
-        'search_terms': ['Lexus IS200', 'Lexus IS300', 'IS200 Sport'],
-        'max_price': 4500,       # Real market: £999-£6,000 (typical £2.5k-£4k)
-        'ni_markup': 800,        # Good drift car demand but common
-        'min_profit': 250,       # High volume, lower margin strategy
-        'avg_uk_price': 3200,    # Average England market price
-        'avg_ni_price': 4000     # Average NI market price
+        'search_terms': ['Lexus IS200', 'Lexus IS300', 'IS200 Sport', 'IS200 manual'],
+        'max_price': 6000,       # Increased range
+        'ni_markup': 700,        # Conservative
+        'min_profit': 100,       # Very low barrier - high volume play
+        'avg_uk_price': 3200,
+        'avg_ni_price': 4000
     },
-    'nissan_200sx': {
-        'search_terms': ['Nissan 200SX', 'Nissan Silvia', '200SX S13', '200SX S14', '200SX S15'],
-        'max_price': 18000,      # Real market: S14 £7.5k-£25k (avg £14.7k)
-        'ni_markup': 2500,       # Strong NI demand but realistic
-        'min_profit': 1500,      # Worth the effort for rare cars
-        'avg_uk_price': 14700,   # Average England market price
-        'avg_ni_price': 17200    # Average NI market price
+    'bmw_e46_320': {
+        'search_terms': ['BMW 320i', 'BMW 320ci', 'E46 320', '320i Sport'],
+        'max_price': 7000,       # More affordable E46
+        'ni_markup': 600,        # Moderate demand
+        'min_profit': 100,       # Accept small profits
+        'avg_uk_price': 3500,
+        'avg_ni_price': 4100
     },
-    'honda_civic_type_r': {
-        'search_terms': ['Honda Civic Type R', 'Civic Type-R EP3', 'Civic Type-R FN2', 'Civic Type R FD2'],
-        'max_price': 15000,      # EP3 £6k-£9k, FN2 £10k-£15k
-        'ni_markup': 1800,       # Good NI track scene demand
-        'min_profit': 1000,      # Decent margin
-        'avg_uk_price': 11000,   # Average England market price
-        'avg_ni_price': 12800    # Average NI market price
-    },
-    'nissan_skyline_r33': {
-        'search_terms': ['Nissan Skyline R33', 'R33 GTS-T', 'Skyline R33 GTR'],
-        'max_price': 30000,      # GTS-T £15k-£28k range
-        'ni_markup': 4000,       # JDM premium in NI
-        'min_profit': 2500,      # Higher value needs buffer
-        'avg_uk_price': 22000,   # Average England market price
-        'avg_ni_price': 26000    # Average NI market price
-    },
-    'nissan_skyline_r32': {
-        'search_terms': ['Nissan Skyline R32', 'R32 GTR', 'R32 GTS-T'],
-        'max_price': 40000,      # GTR £25k-£55k, focus lower end
-        'ni_markup': 5000,       # GTR premium
-        'min_profit': 3000,      # Big investment needs return
-        'avg_uk_price': 35000,   # Average England market price
-        'avg_ni_price': 40000    # Average NI market price
-    },
-    'mazda_rx7_fd': {
-        'search_terms': ['Mazda RX-7 FD', 'Mazda RX7 FD3S', 'RX-7 Import'],
-        'max_price': 30000,      # FD prices £20k-£45k
-        'ni_markup': 4000,       # Rotary tax + NI premium
-        'min_profit': 2500,      # Rare car worth effort
-        'avg_uk_price': 28000,   # Average England market price
-        'avg_ni_price': 32000    # Average NI market price
-    },
-    'mazda_rx7_fc': {
-        'search_terms': ['Mazda RX-7 FC', 'Mazda RX7 FC3S'],
-        'max_price': 10000,      # FC £6k-£12k range
-        'ni_markup': 1500,       # Entry rotary market
-        'min_profit': 800,       # Decent margin
-        'avg_uk_price': 9000,    # Average England market price
-        'avg_ni_price': 10500    # Average NI market price
-    },
-    'toyota_supra': {
-        'search_terms': ['Toyota Supra', 'Supra MK4', 'Supra Twin Turbo'],
-        'max_price': 55000,      # Non-turbo £28k-£55k
-        'ni_markup': 6000,       # Legendary but realistic
-        'min_profit': 4000,      # High value needs buffer
-        'avg_uk_price': 42000,   # Average England market price
-        'avg_ni_price': 48000    # Average NI market price
+    'mazda_mx5': {
+        'search_terms': ['Mazda MX-5', 'Mazda MX5', 'Miata', 'MX5 1.8'],
+        'max_price': 8000,       # Popular drift platform
+        'ni_markup': 600,        # Good NI demand
+        'min_profit': 100,       # Low barrier
+        'avg_uk_price': 4500,
+        'avg_ni_price': 5100
     },
     'nissan_350z': {
-        'search_terms': ['Nissan 350Z', '350Z GT', 'Nissan 370Z'],
-        'max_price': 14000,      # 350Z £6k-£14k, 370Z £12k-£22k
-        'ni_markup': 1800,       # Popular drift platform
-        'min_profit': 1000,      # Good mid-range opportunity
-        'avg_uk_price': 10000,   # Average England market price
-        'avg_ni_price': 11800    # Average NI market price
+        'search_terms': ['Nissan 350Z', '350Z GT', 'Nissan 370Z', '350Z manual'],
+        'max_price': 18000,      # Increased range
+        'ni_markup': 1500,       # Popular platform
+        'min_profit': 500,       # Reasonable profit
+        'avg_uk_price': 10000,
+        'avg_ni_price': 11800
+    },
+
+    # Medium Value Opportunities
+    'bmw_e36_328': {
+        'search_terms': ['BMW E36 328i', 'E36 328i Sport', 'E36 328'],
+        'max_price': 8000,       # Increased
+        'ni_markup': 800,
+        'min_profit': 200,
+        'avg_uk_price': 4500,
+        'avg_ni_price': 5500
+    },
+    'honda_civic_type_r': {
+        'search_terms': ['Honda Civic Type R', 'Civic Type-R EP3', 'Civic Type-R FN2', 'EP3 Type R'],
+        'max_price': 16000,      # Increased
+        'ni_markup': 1500,       # Conservative
+        'min_profit': 500,
+        'avg_uk_price': 11000,
+        'avg_ni_price': 12800
+    },
+    'mazda_rx8': {
+        'search_terms': ['Mazda RX-8', 'Mazda RX8', 'RX8 R3'],
+        'max_price': 8000,       # Affordable rotary
+        'ni_markup': 700,
+        'min_profit': 200,
+        'avg_uk_price': 5000,
+        'avg_ni_price': 5700
+    },
+
+    # High Value Opportunities - Bigger margins but rarer
+    'bmw_e36_m3': {
+        'search_terms': ['BMW E36 M3', 'E36 M3 Evolution', 'E36 M3 3.2', 'M3 E36'],
+        'max_price': 22000,      # Increased
+        'ni_markup': 2500,       # Conservative
+        'min_profit': 1200,      # Need decent margin for high value
+        'avg_uk_price': 18000,
+        'avg_ni_price': 21000
+    },
+    'nissan_200sx': {
+        'search_terms': ['Nissan 200SX', 'Nissan Silvia', '200SX S13', '200SX S14', '200SX S15', 'Silvia S14'],
+        'max_price': 20000,      # Increased for rare finds
+        'ni_markup': 2000,       # Conservative for safety
+        'min_profit': 1000,      # Lower barrier
+        'avg_uk_price': 14700,
+        'avg_ni_price': 17200
+    },
+
+    # Premium JDM - Rare but high profit
+    'nissan_skyline_r33': {
+        'search_terms': ['Nissan Skyline R33', 'R33 GTS-T', 'Skyline R33', 'R33 GTR'],
+        'max_price': 35000,      # Increased
+        'ni_markup': 3500,       # Conservative
+        'min_profit': 2000,      # Need decent margin
+        'avg_uk_price': 22000,
+        'avg_ni_price': 26000
+    },
+    'nissan_skyline_r32': {
+        'search_terms': ['Nissan Skyline R32', 'R32 GTR', 'R32 GTS-T', 'Skyline R32'],
+        'max_price': 45000,      # Increased for GTR finds
+        'ni_markup': 4000,       # Conservative
+        'min_profit': 2500,      # Need buffer
+        'avg_uk_price': 35000,
+        'avg_ni_price': 40000
+    },
+    'mazda_rx7_fd': {
+        'search_terms': ['Mazda RX-7 FD', 'Mazda RX7 FD3S', 'RX-7 Import', 'FD RX7'],
+        'max_price': 35000,      # Increased
+        'ni_markup': 3500,       # Conservative
+        'min_profit': 2000,
+        'avg_uk_price': 28000,
+        'avg_ni_price': 32000
+    },
+    'mazda_rx7_fc': {
+        'search_terms': ['Mazda RX-7 FC', 'Mazda RX7 FC3S', 'FC RX7'],
+        'max_price': 12000,      # Increased
+        'ni_markup': 1200,       # Conservative
+        'min_profit': 600,
+        'avg_uk_price': 9000,
+        'avg_ni_price': 10500
+    },
+    'toyota_supra': {
+        'search_terms': ['Toyota Supra', 'Supra MK4', 'Supra Twin Turbo', 'Supra NA'],
+        'max_price': 60000,      # Increased
+        'ni_markup': 5000,       # Conservative
+        'min_profit': 3000,      # High value car
+        'avg_uk_price': 42000,
+        'avg_ni_price': 48000
     }
 }
 
@@ -187,8 +219,9 @@ def geocode_location(location: str) -> Tuple[float, float]:
     Geocode a UK location to coordinates
     This is a simplified version - in production use Google Maps API or similar
     """
-    # Approximate coordinates for major UK cities near Liverpool
+    # Approximate coordinates for major UK cities (expanded 200-mile radius)
     locations = {
+        # Northwest
         'manchester': (53.4808, -2.2426),
         'liverpool': (53.4084, -2.9916),
         'chester': (53.1908, -2.8908),
@@ -203,6 +236,26 @@ def geocode_location(location: str) -> Tuple[float, float]:
         'lancaster': (54.0466, -2.8007),
         'crewe': (53.0979, -2.4416),
         'stoke': (53.0027, -2.1794),
+        # Yorkshire
+        'leeds': (53.8008, -1.5491),
+        'sheffield': (53.3811, -1.4701),
+        'york': (53.9600, -1.0873),
+        'bradford': (53.7960, -1.7594),
+        'huddersfield': (53.6458, -1.7850),
+        # Midlands
+        'birmingham': (52.4862, -1.8904),
+        'nottingham': (52.9548, -1.1581),
+        'leicester': (52.6369, -1.1398),
+        'derby': (52.9225, -1.4746),
+        'coventry': (52.4068, -1.5197),
+        'wolverhampton': (52.5867, -2.1290),
+        # Wales
+        'cardiff': (51.4816, -3.1791),
+        'swansea': (51.6214, -3.9436),
+        'wrexham': (53.0462, -2.9930),
+        # Other
+        'newcastle': (54.9783, -1.6178),
+        'carlisle': (54.8951, -2.9382),
     }
 
     location_lower = location.lower()
