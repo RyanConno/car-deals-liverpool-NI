@@ -625,8 +625,8 @@ class PistonHeadsScraper:
 
 class CarArbitrageFinder:
     """Main orchestrator for finding car arbitrage opportunities"""
-    
-    def __init__(self):
+
+    def __init__(self, progress_callback=None):
         self.scrapers = [
             AutoTraderScraper(),
             GumtreeScraper(),
@@ -634,35 +634,62 @@ class CarArbitrageFinder:
         ]
         self.all_listings = []
         self.profitable_deals = []
-    
+        self.progress_callback = progress_callback
+
     def search_all(self):
         """Search all sources for all target cars"""
         print("\n" + "="*60)
         print("  CAR ARBITRAGE FINDER - Liverpool → Northern Ireland")
         print("="*60 + "\n")
-        
+
+        # Calculate total searches for progress tracking
+        total_searches = sum(len(config['search_terms']) * len(self.scrapers) for config in TARGET_CARS.values())
+        completed = 0
+
+        if self.progress_callback:
+            self.progress_callback(f"🚀 Starting scraper - {len(TARGET_CARS)} car models, {total_searches} total searches")
+
         for model_type, config in TARGET_CARS.items():
+            model_name = model_type.replace('_', ' ').title()
             print(f"\n🔍 Searching for: {model_type}")
             print(f"   Max price: £{config['max_price']:,} | Expected markup: £{config['ni_markup']:,}")
-            
+
+            if self.progress_callback:
+                self.progress_callback(f"🔍 Searching for {model_name} (max £{config['max_price']:,})")
+
             for search_term in config['search_terms']:
                 for scraper in self.scrapers:
                     try:
+                        scraper_name = scraper.__class__.__name__.replace('Scraper', '')
+
+                        if self.progress_callback:
+                            self.progress_callback(f"📡 {scraper_name}: Searching '{search_term}'...")
+
                         listings = scraper.search(model_type, search_term)
                         self.all_listings.extend(listings)
-                        
+
                         # Filter for profitable deals
                         profitable = [l for l in listings if l.is_profitable()]
                         self.profitable_deals.extend(profitable)
-                        
+
+                        completed += 1
+                        progress_pct = int((completed / total_searches) * 100)
+
                         if profitable:
                             print(f"   ✓ Found {len(profitable)} profitable deals")
+                            if self.progress_callback:
+                                self.progress_callback(f"✅ {scraper_name}: Found {len(profitable)} deals ({progress_pct}% complete)")
+                        else:
+                            if self.progress_callback:
+                                self.progress_callback(f"   {scraper_name}: No deals found ({progress_pct}% complete)")
 
                         # Random delay between 2-5 seconds to be respectful
                         time.sleep(random.uniform(2.0, 5.0))
-                        
+
                     except Exception as e:
                         print(f"   ✗ Error with {scraper.__class__.__name__}: {e}")
+                        if self.progress_callback:
+                            self.progress_callback(f"⚠️ {scraper.__class__.__name__}: Error - {str(e)[:50]}")
         
         # Remove duplicates based on URL
         seen_urls = set()

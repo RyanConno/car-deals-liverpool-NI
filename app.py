@@ -23,11 +23,38 @@ scraper_status = {
     'running': False,
     'last_run': None,
     'last_result': None,
-    'error': None
+    'error': None,
+    'progress': 0,
+    'current_action': '',
+    'total_searches': 0,
+    'completed_searches': 0,
+    'action_log': []
 }
 
 latest_deals = []
 current_finder = None  # Reference to active scraper instance
+
+
+def log_action(message):
+    """Log a scraping action to the status"""
+    global scraper_status
+    import re
+
+    scraper_status['current_action'] = message
+    scraper_status['action_log'].append({
+        'time': datetime.now().strftime('%H:%M:%S'),
+        'message': message
+    })
+
+    # Extract progress percentage from message if present
+    progress_match = re.search(r'(\d+)%\s+complete', message)
+    if progress_match:
+        scraper_status['progress'] = int(progress_match.group(1))
+
+    # Keep only last 20 log entries
+    if len(scraper_status['action_log']) > 20:
+        scraper_status['action_log'] = scraper_status['action_log'][-20:]
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
 
 
 def update_deals_from_finder(finder):
@@ -62,15 +89,28 @@ def run_scraper_background(use_demo=False):
     try:
         scraper_status['running'] = True
         scraper_status['error'] = None
+        scraper_status['progress'] = 0
+        scraper_status['current_action'] = 'Initializing scraper...'
+        scraper_status['action_log'] = []
         latest_deals = []  # Clear existing deals immediately
 
-        finder = CarArbitrageFinder()
+        log_action("🚀 Initializing Car Arbitrage Scraper...")
+
+        # Create finder with progress callback
+        finder = CarArbitrageFinder(progress_callback=log_action)
         current_finder = finder  # Make finder accessible globally
 
         if use_demo:
+            log_action("🎬 Running in DEMO mode with sample data")
             finder.profitable_deals = [d for d in create_sample_data() if d.is_profitable()]
             update_deals_from_finder(finder)
+            log_action(f"✅ Demo complete - {len(finder.profitable_deals)} sample deals loaded")
         else:
+            # Calculate total searches
+            total_searches = sum(len(config['search_terms']) * 3 for config in TARGET_CARS.values())
+            scraper_status['total_searches'] = total_searches
+            scraper_status['completed_searches'] = 0
+
             # Start a monitor thread to update deals in real-time
             def monitor_deals():
                 while scraper_status['running']:
@@ -81,11 +121,14 @@ def run_scraper_background(use_demo=False):
             monitor_thread = threading.Thread(target=monitor_deals, daemon=True)
             monitor_thread.start()
 
+            log_action(f"📊 Searching {len(TARGET_CARS)} car models across 3 websites")
             finder.search_all()
             update_deals_from_finder(finder)  # Final update
+            log_action(f"✅ Scraping complete - {len(finder.profitable_deals)} deals found")
 
         # Store results (keep existing code)
         update_deals_from_finder(finder)
+        scraper_status['progress'] = 100
 
         # Export files
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -336,6 +379,77 @@ def index():
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .progress-container {
+            background: #1a1f3a;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #6666ff33;
+            display: none;
+        }
+        .progress-container.active {
+            display: block;
+        }
+        .progress-bar {
+            background: #2a2f4a;
+            height: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 15px 0;
+            border: 1px solid #6666ff33;
+        }
+        .progress-fill {
+            background: linear-gradient(90deg, #00ff88 0%, #00cc6a 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0a0e27;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        .current-action {
+            color: #00ff88;
+            font-size: 1.1em;
+            margin: 10px 0;
+            padding: 10px;
+            background: #2a2f4a;
+            border-radius: 8px;
+            border-left: 4px solid #00ff88;
+        }
+        .action-log {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 15px;
+            background: #0f1329;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .action-log-item {
+            padding: 5px 10px;
+            margin: 3px 0;
+            font-size: 0.9em;
+            color: #888;
+            border-left: 2px solid #444;
+        }
+        .action-log-item .time {
+            color: #6666ff;
+            margin-right: 8px;
+            font-family: 'Courier New', monospace;
+        }
+        .action-log::-webkit-scrollbar {
+            width: 8px;
+        }
+        .action-log::-webkit-scrollbar-track {
+            background: #1a1f3a;
+            border-radius: 4px;
+        }
+        .action-log::-webkit-scrollbar-thumb {
+            background: #6666ff;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -352,6 +466,19 @@ def index():
         </header>
 
         <div id="status"></div>
+
+        <!-- Progress Tracker -->
+        <div id="progress-container" class="progress-container">
+            <h3 style="color: #6666ff; margin-bottom: 10px;">🔄 Scraping Progress</h3>
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill">0%</div>
+            </div>
+            <div id="current-action" class="current-action">Initializing...</div>
+            <details open>
+                <summary style="color: #888; cursor: pointer; margin-top: 15px;">📋 Action Log</summary>
+                <div id="action-log" class="action-log"></div>
+            </details>
+        </div>
 
         <div class="stats" id="stats" style="display:none;">
             <div class="stat-card">
@@ -401,6 +528,14 @@ def index():
             dealsList.innerHTML = '<div class="loading"><div class="spinner"></div>Searching for deals...</div>';
             document.getElementById('stats').style.display = 'none';
 
+            // Show progress container
+            const progressContainer = document.getElementById('progress-container');
+            progressContainer.classList.add('active');
+            document.getElementById('progress-fill').style.width = '0%';
+            document.getElementById('progress-fill').textContent = '0%';
+            document.getElementById('current-action').textContent = 'Initializing scraper...';
+            document.getElementById('action-log').innerHTML = '';
+
             const url = demo ? '/api/scrape?demo=true' : '/api/scrape';
 
             try {
@@ -409,7 +544,7 @@ def index():
 
                 if (data.status === 'started') {
                     showStatus('Scraper running... This may take 5-15 minutes', 'running');
-                    statusCheckInterval = setInterval(checkStatus, 3000);
+                    statusCheckInterval = setInterval(checkStatus, 1000);  // Check every second
 
                     // Start polling for deals in real-time
                     dealsPollingInterval = setInterval(loadDeals, 2000);
@@ -417,6 +552,7 @@ def index():
             } catch (error) {
                 showStatus('Error starting scraper: ' + error.message, 'error');
                 btn.disabled = false;
+                progressContainer.classList.remove('active');
             }
         }
 
@@ -425,10 +561,37 @@ def index():
                 const response = await fetch('/api/status');
                 const data = await response.json();
 
+                // Update progress bar
+                if (data.running && data.progress !== undefined) {
+                    const progressFill = document.getElementById('progress-fill');
+                    progressFill.style.width = data.progress + '%';
+                    progressFill.textContent = data.progress + '%';
+                }
+
+                // Update current action
+                if (data.current_action) {
+                    document.getElementById('current-action').textContent = data.current_action;
+                }
+
+                // Update action log
+                if (data.action_log && data.action_log.length > 0) {
+                    const actionLog = document.getElementById('action-log');
+                    actionLog.innerHTML = data.action_log.map(log =>
+                        `<div class="action-log-item"><span class="time">${log.time}</span>${log.message}</div>`
+                    ).reverse().join('');
+                    // Auto-scroll to bottom
+                    actionLog.scrollTop = actionLog.scrollHeight;
+                }
+
                 if (!data.running && data.last_run) {
                     clearInterval(statusCheckInterval);
                     clearInterval(dealsPollingInterval);  // Stop polling
                     document.getElementById('scrape-btn').disabled = false;
+
+                    // Hide progress container after a delay
+                    setTimeout(() => {
+                        document.getElementById('progress-container').classList.remove('active');
+                    }, 5000);
 
                     if (data.error) {
                         showStatus('Scraper error: ' + data.error, 'error');
