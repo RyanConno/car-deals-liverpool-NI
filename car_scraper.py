@@ -228,11 +228,23 @@ class CarListing:
     def is_profitable(self) -> bool:
         """Check if this listing meets profit criteria"""
         car_config = TARGET_CARS.get(self.model_type, {})
+        title_lower = self.title.lower()
+
+        # Filter out "WANTED" posts (people looking to buy, not selling)
+        wanted_keywords = ['wanted', 'looking for', 'wtb', 'want to buy', 'searching for', 'iso']
+        for kw in wanted_keywords:
+            if kw in title_lower:
+                return False
+
+        # Filter out touring / estate variants
+        estate_keywords = ['touring', 'estate', 'tourer', 'avant', 'sportback']
+        for kw in estate_keywords:
+            if kw in title_lower:
+                return False
 
         # Check exclude keywords (e.g. filter out FN2 from EP3 searches)
         exclude_keywords = car_config.get('exclude_keywords', [])
         if exclude_keywords:
-            title_lower = self.title.lower()
             for kw in exclude_keywords:
                 if kw.lower() in title_lower:
                     return False
@@ -937,8 +949,24 @@ class CarArbitrageFinder:
         avg_profit = total_profit / len(sorted_deals)
         best_margin = max(d.profit_margin for d in sorted_deals)
 
+        # Build list of unique model types for filter dropdown
+        model_labels = {
+            'peugeot_306_dturbo': 'Peugeot 306 D-Turbo',
+            'lexus_is200': 'Lexus IS200',
+            'bmw_e46_330': 'BMW E46 330i/ci',
+            'honda_civic_ep3_type_r': 'Honda Civic EP3 Type R',
+            'bmw_e60_530d': 'BMW E60 530d',
+            'bmw_e60_535d': 'BMW E60 535d',
+            'bmw_f30_330d': 'BMW F30 330d',
+            'bmw_f30_335d': 'BMW F30 335d',
+        }
+
         car_data_json = []
+        unique_models = set()
+        unique_sources = set()
         for deal in sorted_deals:
+            unique_models.add(deal.model_type)
+            unique_sources.add(deal.source)
             car_data_json.append({
                 'model': deal.model_type,
                 'title': deal.title,
@@ -950,27 +978,103 @@ class CarArbitrageFinder:
                 'distance': f'{deal.distance:.1f}',
                 'year': deal.year,
                 'mileage': deal.mileage,
+                'source': deal.source,
                 'url': deal.url
             })
 
+        # Build dropdown options
+        model_options = ''.join(
+            f'<option value="{m}">{model_labels.get(m, m)}</option>'
+            for m in sorted(unique_models)
+        )
+        source_options = ''.join(
+            f'<option value="{s}">{s}</option>'
+            for s in sorted(unique_sources)
+        )
+
         html_content = f'''<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Car Arbitrage Report</title>
-<style>body{{font-family:sans-serif;background:#0a0e27;color:#e0e0e0;padding:20px;}}
+<style>
+body{{font-family:sans-serif;background:#0a0e27;color:#e0e0e0;padding:20px;}}
 h1{{color:#00ff88;text-align:center;}}
+.filters{{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin:20px 0;}}
+.filters select{{background:#1a1f3a;color:#e0e0e0;border:1px solid #00ff88;padding:10px 16px;border-radius:6px;font-size:14px;cursor:pointer;min-width:200px;}}
+.filters select:hover{{border-color:#00ffaa;}}
+.filter-label{{color:#888;font-size:12px;text-align:center;margin-bottom:4px;}}
+.stats{{text-align:center;color:#888;margin:10px 0;}}
+.stats span{{color:#00ff88;font-weight:bold;}}
 table{{width:100%;border-collapse:collapse;margin-top:20px;}}
-th{{background:#00ff88;color:#0a0e27;padding:12px;text-align:left;}}
+th{{background:#00ff88;color:#0a0e27;padding:12px;text-align:left;cursor:pointer;user-select:none;}}
+th:hover{{background:#00ddaa;}}
 td{{padding:10px;border-bottom:1px solid #2a2f4a;}}
 tr:hover{{background:#252a45;}}
+tr.hidden{{display:none;}}
 .profit{{color:#00ff88;font-weight:bold;}}
-a{{color:#6666ff;}}</style></head>
-<body><h1>Car Arbitrage Report - {datetime.now().strftime("%Y-%m-%d %H:%M")}</h1>
-<p style="text-align:center;color:#888;">{len(sorted_deals)} deals | £{total_profit:,} total profit | £{avg_profit:,.0f} avg</p>
-<table><thead><tr><th>Car</th><th>Price</th><th>NI Price</th><th>Profit</th><th>Margin</th><th>Location</th><th>Link</th></tr></thead><tbody>'''
+a{{color:#6666ff;}}
+</style></head>
+<body>
+<h1>Car Arbitrage Report - {datetime.now().strftime("%Y-%m-%d %H:%M")}</h1>
+<p class="stats">{len(sorted_deals)} deals | £{total_profit:,} total profit | £{avg_profit:,.0f} avg</p>
+
+<div class="filters">
+  <div>
+    <div class="filter-label">Filter by Model</div>
+    <select id="modelFilter" onchange="applyFilters()">
+      <option value="all">All Models</option>
+      {model_options}
+    </select>
+  </div>
+  <div>
+    <div class="filter-label">Filter by Source</div>
+    <select id="sourceFilter" onchange="applyFilters()">
+      <option value="all">All Sources</option>
+      {source_options}
+    </select>
+  </div>
+</div>
+<p class="stats" id="filteredStats"></p>
+
+<table>
+<thead><tr><th>Car</th><th>Year</th><th>Price</th><th>NI Price</th><th>Profit</th><th>Margin</th><th>Location</th><th>Source</th><th>Link</th></tr></thead>
+<tbody id="dealRows">'''
 
         for deal in car_data_json:
-            html_content += f'<tr><td>{deal["title"]}</td><td>{deal["price"]}</td><td>{deal["ni_price"]}</td><td class="profit">{deal["profit"]}</td><td>{deal["margin"]}</td><td>{deal["location"]}</td><td><a href="{deal["url"]}" target="_blank">View</a></td></tr>'
+            html_content += (
+                f'<tr data-model="{deal["model"]}" data-source="{deal["source"]}">'
+                f'<td>{deal["title"]}</td>'
+                f'<td>{deal["year"]}</td>'
+                f'<td>{deal["price"]}</td>'
+                f'<td>{deal["ni_price"]}</td>'
+                f'<td class="profit">{deal["profit"]}</td>'
+                f'<td>{deal["margin"]}</td>'
+                f'<td>{deal["location"]}</td>'
+                f'<td>{deal["source"]}</td>'
+                f'<td><a href="{deal["url"]}" target="_blank">View</a></td>'
+                f'</tr>'
+            )
 
-        html_content += '</tbody></table></body></html>'
+        html_content += '''</tbody></table>
+<script>
+function applyFilters() {
+  var model = document.getElementById('modelFilter').value;
+  var source = document.getElementById('sourceFilter').value;
+  var rows = document.querySelectorAll('#dealRows tr');
+  var shown = 0;
+  rows.forEach(function(row) {
+    var matchModel = (model === 'all' || row.getAttribute('data-model') === model);
+    var matchSource = (source === 'all' || row.getAttribute('data-source') === source);
+    if (matchModel && matchSource) {
+      row.classList.remove('hidden');
+      shown++;
+    } else {
+      row.classList.add('hidden');
+    }
+  });
+  document.getElementById('filteredStats').textContent = 'Showing ' + shown + ' of ' + rows.length + ' deals';
+}
+applyFilters();
+</script>
+</body></html>'''
 
         with open(filename, 'w', encoding='utf-8') as f:
             f.write(html_content)
