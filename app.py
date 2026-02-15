@@ -360,7 +360,6 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg-
         </div>
         <div class="nav-actions">
             <a href="/search-links" class="btn btn-outline">Manual Search</a>
-            <button onclick="doScrape(true)" class="btn btn-outline">Demo Mode</button>
             <button onclick="loadDeals()" class="btn btn-outline">Refresh</button>
             <button onclick="doScrape(false)" id="scrape-btn" class="btn btn-primary">Scrape Live Data</button>
         </div>
@@ -571,7 +570,7 @@ function loadDeals() {
         allDeals = JSON.parse(xhr.responseText);
 
         if (allDeals.length === 0) {
-            document.getElementById('deals').innerHTML = '<div class="loading">No deals found yet. Click "Scrape Live Data" or "Demo Mode" to find deals.</div>';
+            document.getElementById('deals').innerHTML = '<div class="loading">No deals found yet. Click "Scrape Live Data" to find deals.</div>';
             document.getElementById('stats').style.display = 'none';
             document.getElementById('filterCount').textContent = '';
             return;
@@ -795,15 +794,8 @@ if __name__ == '__main__':
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # Load demo data on startup
-    try:
-        finder = CarArbitrageFinder()
-        finder.profitable_deals = [d for d in create_sample_data() if d.is_profitable()]
-        latest_deals = [deal_to_dict(d) for d in sorted(finder.profitable_deals, key=lambda x: x.net_profit, reverse=True)]
-        print(f"Loaded {len(latest_deals)} demo deals on startup")
-    except Exception as e:
-        print(f"WARNING: Could not load demo data: {e}")
-        latest_deals = []
+    # Start with empty deals - user clicks Scrape to begin
+    latest_deals = []
 
     print("\n" + "="*60)
     print("  NO-MO CARS WEB APP STARTING")
