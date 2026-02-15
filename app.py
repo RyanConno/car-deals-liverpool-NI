@@ -27,44 +27,65 @@ scraper_status = {
 }
 
 latest_deals = []
+current_finder = None  # Reference to active scraper instance
+
+
+def update_deals_from_finder(finder):
+    """Convert finder's deals to API format"""
+    global latest_deals
+    latest_deals = [
+        {
+            'model_type': d.model_type,
+            'title': d.title,
+            'price': d.price,
+            'avg_uk_price': d.avg_uk_price,
+            'uk_saving': d.uk_saving,
+            'expected_ni_price': d.expected_ni_price,
+            'avg_ni_price': d.avg_ni_price,
+            'net_profit': d.net_profit,
+            'profit_margin': d.profit_margin,
+            'location': d.location,
+            'distance': round(d.distance, 1),
+            'year': d.year,
+            'mileage': d.mileage,
+            'source': d.source,
+            'url': d.url
+        }
+        for d in sorted(finder.profitable_deals, key=lambda x: x.net_profit, reverse=True)
+    ]
 
 
 def run_scraper_background(use_demo=False):
     """Run the scraper in background"""
-    global scraper_status, latest_deals
+    global scraper_status, latest_deals, current_finder
 
     try:
         scraper_status['running'] = True
         scraper_status['error'] = None
+        latest_deals = []  # Clear existing deals immediately
 
         finder = CarArbitrageFinder()
+        current_finder = finder  # Make finder accessible globally
 
         if use_demo:
             finder.profitable_deals = [d for d in create_sample_data() if d.is_profitable()]
+            update_deals_from_finder(finder)
         else:
-            finder.search_all()
+            # Start a monitor thread to update deals in real-time
+            def monitor_deals():
+                while scraper_status['running']:
+                    if finder.profitable_deals:
+                        update_deals_from_finder(finder)
+                    threading.Event().wait(2)  # Update every 2 seconds
 
-        # Store results
-        latest_deals = [
-            {
-                'model_type': d.model_type,
-                'title': d.title,
-                'price': d.price,
-                'avg_uk_price': d.avg_uk_price,
-                'uk_saving': d.uk_saving,
-                'expected_ni_price': d.expected_ni_price,
-                'avg_ni_price': d.avg_ni_price,
-                'net_profit': d.net_profit,
-                'profit_margin': d.profit_margin,
-                'location': d.location,
-                'distance': round(d.distance, 1),
-                'year': d.year,
-                'mileage': d.mileage,
-                'source': d.source,
-                'url': d.url
-            }
-            for d in sorted(finder.profitable_deals, key=lambda x: x.net_profit, reverse=True)
-        ]
+            monitor_thread = threading.Thread(target=monitor_deals, daemon=True)
+            monitor_thread.start()
+
+            finder.search_all()
+            update_deals_from_finder(finder)  # Final update
+
+        # Store results (keep existing code)
+        update_deals_from_finder(finder)
 
         # Export files
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -131,7 +152,7 @@ def index():
             flex-wrap: wrap;
             margin-top: 25px;
         }
-        button {
+        button, .btn-link {
             background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
             color: #0a0e27;
             border: none;
@@ -143,8 +164,10 @@ def index():
             transition: all 0.3s;
             text-transform: uppercase;
             letter-spacing: 1px;
+            text-decoration: none;
+            display: inline-block;
         }
-        button:hover {
+        button:hover, .btn-link:hover {
             transform: translateY(-3px);
             box-shadow: 0 8px 25px rgba(0,255,136,0.4);
         }
@@ -156,6 +179,10 @@ def index():
         }
         .btn-secondary {
             background: linear-gradient(135deg, #6666ff 0%, #4444dd 100%);
+            color: white;
+        }
+        .btn-search {
+            background: linear-gradient(135deg, #ffaa00 0%, #ff8800 100%);
             color: white;
         }
         .stats {
@@ -317,6 +344,7 @@ def index():
             <h1>🏎️ Car Arbitrage Dashboard</h1>
             <p class="subtitle">Liverpool → Northern Ireland | Live Drift & Race Car Deals</p>
             <div class="controls">
+                <a href="/search-links" class="btn-link btn-search">🔗 Manual Search Links</a>
                 <button onclick="runScraper(false)" id="scrape-btn">🔍 Scrape Live Data</button>
                 <button onclick="runScraper(true)" class="btn-secondary">🎬 Demo Mode</button>
                 <button onclick="loadDeals()" class="btn-secondary">🔄 Refresh</button>
@@ -362,10 +390,16 @@ def index():
 
     <script>
         let statusCheckInterval;
+        let dealsPollingInterval;
 
         async function runScraper(demo) {
             const btn = document.getElementById('scrape-btn');
             btn.disabled = true;
+
+            // Clear existing deals immediately
+            const dealsList = document.getElementById('deals-list');
+            dealsList.innerHTML = '<div class="loading"><div class="spinner"></div>Searching for deals...</div>';
+            document.getElementById('stats').style.display = 'none';
 
             const url = demo ? '/api/scrape?demo=true' : '/api/scrape';
 
@@ -376,6 +410,9 @@ def index():
                 if (data.status === 'started') {
                     showStatus('Scraper running... This may take 5-15 minutes', 'running');
                     statusCheckInterval = setInterval(checkStatus, 3000);
+
+                    // Start polling for deals in real-time
+                    dealsPollingInterval = setInterval(loadDeals, 2000);
                 }
             } catch (error) {
                 showStatus('Error starting scraper: ' + error.message, 'error');
@@ -390,13 +427,14 @@ def index():
 
                 if (!data.running && data.last_run) {
                     clearInterval(statusCheckInterval);
+                    clearInterval(dealsPollingInterval);  // Stop polling
                     document.getElementById('scrape-btn').disabled = false;
 
                     if (data.error) {
                         showStatus('Scraper error: ' + data.error, 'error');
                     } else {
                         showStatus('✓ Scraper completed successfully!', 'success');
-                        loadDeals();
+                        loadDeals();  // Final update
                     }
                 }
             } catch (error) {
@@ -406,14 +444,21 @@ def index():
 
         async function loadDeals() {
             const dealsList = document.getElementById('deals-list');
-            dealsList.innerHTML = '<div class="loading"><div class="spinner"></div>Loading deals...</div>';
 
             try {
                 const response = await fetch('/api/deals');
                 const deals = await response.json();
 
+                // Check if scraper is running
+                const statusResponse = await fetch('/api/status');
+                const status = await statusResponse.json();
+
                 if (deals.length === 0) {
-                    dealsList.innerHTML = '<div class="loading">No deals found. Run the scraper to find opportunities!</div>';
+                    if (status.running) {
+                        dealsList.innerHTML = '<div class="loading"><div class="spinner"></div>Searching... No deals found yet.</div>';
+                    } else {
+                        dealsList.innerHTML = '<div class="loading">No deals found. Run the scraper to find opportunities!</div>';
+                    }
                     document.getElementById('stats').style.display = 'none';
                     return;
                 }
@@ -429,8 +474,14 @@ def index():
                 document.getElementById('best-margin').textContent = bestMargin.toFixed(1) + '%';
                 document.getElementById('stats').style.display = 'grid';
 
+                // Add live update indicator if scraper is running
+                let liveIndicator = '';
+                if (status.running) {
+                    liveIndicator = '<div style="background: rgba(255, 170, 0, 0.2); border-left: 4px solid #ffaa00; padding: 15px; margin-bottom: 20px; border-radius: 8px;"><strong>🔄 Live Updates:</strong> Deals are being added as they\'re found...</div>';
+                }
+
                 // Render deals
-                dealsList.innerHTML = deals.map(deal => `
+                dealsList.innerHTML = liveIndicator + deals.map(deal => `
                     <div class="deal-card">
                         <div class="deal-title">${deal.title}</div>
                         <div class="deal-info">

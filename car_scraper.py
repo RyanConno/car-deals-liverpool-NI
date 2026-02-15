@@ -21,46 +21,78 @@ import random
 
 # Configuration
 LIVERPOOL_COORDS = (53.4084, -2.9916)
-MAX_DISTANCE_MILES = 200  # Expanded from 100 - covers Manchester, Birmingham, Leeds
+MAX_DISTANCE_MILES = 300  # VERY LENIENT - covers most of England
 OUTPUT_DIR = "./car_deals"
 # Updated costs for longer distances
 COSTS_PER_CAR = 650  # Ferry £200 + Fuel £100 (longer trips) + Insurance £250 + Admin £100
 
 # Target models with search terms and profit expectations
-# Updated February 2026 - Based on verified England vs NI market data
-# Focus on 4 high-demand models with proven arbitrage opportunities
+# TEMPORARY: VERY LENIENT SETTINGS - Testing to prove scraper works
+# Will tighten these criteria once we confirm results are coming back
 TARGET_CARS = {
     'peugeot_306_dturbo': {
         'search_terms': ['Peugeot 306 D-Turbo', 'Peugeot 306 DTurbo', '306 D Turbo', '306 Diesel'],
-        'max_price': 5500,       # England range: £3k-£5.5k
+        'max_price': 10000,      # LENIENT: 2x normal (was 5500)
         'ni_markup': 1250,       # NI premium: 15-30% (avg £1,250)
-        'min_profit': 500,       # After £650 costs = £600+ profit
+        'min_profit': 0,         # LENIENT: Accept ANY profit (was 500)
         'avg_uk_price': 4250,    # Midpoint of £3k-£5.5k
         'avg_ni_price': 5500     # Midpoint of £4k-£7k (NI range)
     },
     'lexus_is200': {
         'search_terms': ['Lexus IS200', 'Lexus IS-200', 'IS200 Sport', 'IS200 manual'],
-        'max_price': 4000,       # England range: £2.5k-£4k
+        'max_price': 8000,       # LENIENT: 2x normal (was 4000)
         'ni_markup': 1000,       # NI premium: 20-30% (avg £1,000)
-        'min_profit': 300,       # After £650 costs = £350+ profit
+        'min_profit': 0,         # LENIENT: Accept ANY profit (was 300)
         'avg_uk_price': 3250,    # Midpoint of £2.5k-£4k
         'avg_ni_price': 4250     # Midpoint of £3.5k-£5k (NI range)
     },
     'bmw_e46_330': {
         'search_terms': ['BMW 330i', 'BMW 330ci', 'E46 330', '330i Sport', '330ci M Sport'],
-        'max_price': 5500,       # England range: £2.5k-£5.5k
+        'max_price': 12000,      # LENIENT: 2x+ normal (was 5500)
         'ni_markup': 1750,       # NI premium: 25-35% (avg £1,750)
-        'min_profit': 500,       # After £650 costs = £1,100+ profit
+        'min_profit': 0,         # LENIENT: Accept ANY profit (was 500)
         'avg_uk_price': 4000,    # Midpoint of £2.5k-£5.5k
         'avg_ni_price': 5750     # Midpoint of £4k-£7.5k (NI range)
     },
     'honda_civic_ep3_type_r': {
         'search_terms': ['Honda Civic Type R', 'Civic Type-R EP3', 'EP3 Type R', 'Civic Type R EP3'],
-        'max_price': 9000,       # England range: £3k-£9k
+        'max_price': 18000,      # LENIENT: 2x normal (was 9000)
         'ni_markup': 2500,       # NI premium: 25-40% (avg £2,500)
-        'min_profit': 1000,      # After £650 costs = £1,850+ profit
+        'min_profit': 0,         # LENIENT: Accept ANY profit (was 1000)
         'avg_uk_price': 6000,    # Midpoint of £3k-£9k
         'avg_ni_price': 8500     # Midpoint of £5k-£12k (NI range)
+    },
+    'bmw_e60_530d': {
+        'search_terms': ['BMW 530d', 'E60 530d', '530d Sport', 'BMW 530 diesel'],
+        'max_price': 10000,      # LENIENT: 2x+ normal (was 4800)
+        'ni_markup': 1450,       # NI premium: 30-40% (avg £1,450)
+        'min_profit': 0,         # LENIENT: Accept ANY profit (was 500)
+        'avg_uk_price': 3800,    # Midpoint of £2.8k-£4.8k
+        'avg_ni_price': 5250     # Midpoint of £4k-£6.5k (NI range)
+    },
+    'bmw_e60_535d': {
+        'search_terms': ['BMW 535d', 'E60 535d', '535d M-Sport', 'BMW 535 diesel'],
+        'max_price': 13000,      # LENIENT: 2x normal (was 6500)
+        'ni_markup': 2250,       # NI premium: 30-45% (avg £2,250)
+        'min_profit': 0,         # LENIENT: Accept ANY profit (was 700)
+        'avg_uk_price': 5250,    # Midpoint of £4k-£6.5k
+        'avg_ni_price': 7500     # Midpoint of £6k-£9k (NI range)
+    },
+    'bmw_f30_330d': {
+        'search_terms': ['BMW 330d', 'F30 330d', '330d Sport', '330d M-Sport'],
+        'max_price': 25000,      # LENIENT: 2x normal (was 12500)
+        'ni_markup': 2750,       # NI premium: 20-30% (avg £2,750)
+        'min_profit': 0,         # LENIENT: Accept ANY profit (was 1000)
+        'avg_uk_price': 10500,   # Midpoint of £8.5k-£12.5k
+        'avg_ni_price': 13250    # Midpoint of £11k-£15.5k (NI range)
+    },
+    'bmw_f30_335d': {
+        'search_terms': ['BMW 335d', 'F30 335d', '335d M-Sport', '335d xDrive'],
+        'max_price': 35000,      # LENIENT: 2x normal (was 17000)
+        'ni_markup': 3000,       # NI premium: 20-30% (avg £3,000)
+        'min_profit': 0,         # LENIENT: Accept ANY profit (was 1200)
+        'avg_uk_price': 14250,   # Midpoint of £11.5k-£17k
+        'avg_ni_price': 17250    # Midpoint of £14.5k-£20k (NI range)
     }
 }
 
