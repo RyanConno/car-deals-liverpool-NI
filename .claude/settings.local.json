@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(where python*)"
+      "Bash(where python*)",
+      "Bash(python app.py:*)",
+      "Bash(python -m py_compile:*)"
     ]
   }
 }
