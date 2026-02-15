@@ -27,31 +27,61 @@ COSTS_PER_CAR = 650  # Ferry £200 + Fuel £100 + Insurance £250 + Admin £100
 # TEMPORARY: VERY LENIENT SETTINGS - Testing to prove scraper works
 TARGET_CARS = {
     'peugeot_306_dturbo': {
-        'search_terms': ['Peugeot 306 D-Turbo', 'Peugeot 306 DTurbo', '306 D Turbo', '306 Diesel'],
+        'search_terms': ['Peugeot 306 D-Turbo', 'Peugeot 306 DTurbo', '306 D Turbo'],
         'make': 'Peugeot', 'model': '306',
         'max_price': 5000,
         'ni_markup': 2700,
         'min_profit': 1000,
         'avg_uk_price': 3500,
-        'avg_ni_price': 6200
+        'avg_ni_price': 6200,
+        'require_keywords': ['d-turbo', 'dturbo', 'd turbo', 'dt', 'diesel turbo'],
+        'exclude_keywords': ['petrol', 'gti', 'xsi', 'rallye', 'cabriolet', 'estate']
     },
-    'lexus_is200': {
-        'search_terms': ['Lexus IS200', 'Lexus IS-200', 'IS200 Sport', 'IS200 manual'],
+    'lexus_is200_sport': {
+        'search_terms': ['Lexus IS200 Sport', 'IS200 Sport', 'IS 200 Sport'],
         'make': 'Lexus', 'model': 'IS',
         'max_price': 6000,
         'ni_markup': 2700,
         'min_profit': 1000,
         'avg_uk_price': 3000,
-        'avg_ni_price': 5700
+        'avg_ni_price': 5700,
+        'require_keywords': ['sport'],
+        'exclude_keywords': ['se', 's.e', 'se auto']
     },
-    'bmw_e46_330': {
-        'search_terms': ['BMW 330i', 'BMW 330ci', 'E46 330', '330i Sport', '330ci M Sport'],
+    'lexus_is250_sport': {
+        'search_terms': ['Lexus IS250 Sport', 'IS250 Sport manual', 'IS 250 Sport'],
+        'make': 'Lexus', 'model': 'IS',
+        'max_price': 8000,
+        'ni_markup': 2700,
+        'min_profit': 1000,
+        'avg_uk_price': 4500,
+        'avg_ni_price': 7200,
+        'require_keywords': ['sport'],
+        'exclude_keywords': ['se', 's.e', 'auto', 'automatic']
+    },
+    'bmw_e46_330ci': {
+        'search_terms': ['BMW 330ci', 'E46 330ci', '330ci Sport', '330ci M Sport', 'BMW 330 ci'],
         'make': 'BMW', 'model': '3 Series',
         'max_price': 8000,
         'ni_markup': 2800,
         'min_profit': 1000,
         'avg_uk_price': 5000,
-        'avg_ni_price': 7800
+        'avg_ni_price': 7800,
+        'year_min': 1999, 'year_max': 2006,
+        'require_keywords': ['330ci', '330 ci', '330 coupe', '330i coupe', 'e46'],
+        'exclude_keywords': ['e90', 'e92', 'f30', 'f32', 'g20', 'g22', '2007', '2008', '2009', '2010', '2011', '2012', '2013', '2014', '2015', '2016', '2017', '2018', '2019', '2020', 'touring', 'estate']
+    },
+    'bmw_e46_m3': {
+        'search_terms': ['BMW M3 E46', 'E46 M3', 'BMW M3 coupe', 'BMW M3 convertible'],
+        'make': 'BMW', 'model': 'M3',
+        'max_price': 25000,
+        'ni_markup': 4000,
+        'min_profit': 1000,
+        'avg_uk_price': 18000,
+        'avg_ni_price': 22000,
+        'year_min': 2000, 'year_max': 2006,
+        'require_keywords': ['m3'],
+        'exclude_keywords': ['e90', 'e92', 'f80', 'g80', 'e36', 'e30', '2007', '2008', '2009', '2010', '2011', '2012', '2013', '2014', '2015', '2016', '2017', '2018', '2019', '2020', 'competition', 'cs']
     },
     'honda_civic_ep3_type_r': {
         'search_terms': ['Honda Civic Type R EP3', 'Civic EP3 Type R', 'EP3 Type R', 'Honda Civic Type R'],
@@ -65,48 +95,62 @@ TARGET_CARS = {
         'exclude_keywords': ['fn2', 'fk2', 'fk8', 'fl5', '2006', '2007', '2008', '2009', '2010', '2011']
     },
     'bmw_e60_530d': {
-        'search_terms': ['BMW 530d', 'E60 530d', '530d Sport', 'BMW 530 diesel'],
+        'search_terms': ['BMW 530d', 'BMW 5 Series 530d', 'E60 530d', '530d Sport'],
         'make': 'BMW', 'model': '5 Series',
         'max_price': 7000,
         'ni_markup': 2700,
         'min_profit': 1000,
         'avg_uk_price': 4500,
-        'avg_ni_price': 7200
+        'avg_ni_price': 7200,
+        'year_min': 2003, 'year_max': 2010,
+        'require_keywords': ['530d', '530 d', '530'],
+        'exclude_keywords': ['f10', 'g30', 'touring', 'estate']
     },
     'bmw_e60_535d': {
-        'search_terms': ['BMW 535d', 'E60 535d', '535d M-Sport', 'BMW 535 diesel'],
+        'search_terms': ['BMW 535d', 'BMW 5 Series 535d', 'E60 535d', '535d M-Sport'],
         'make': 'BMW', 'model': '5 Series',
         'max_price': 9000,
         'ni_markup': 2800,
         'min_profit': 1000,
         'avg_uk_price': 5500,
-        'avg_ni_price': 8300
+        'avg_ni_price': 8300,
+        'year_min': 2004, 'year_max': 2010,
+        'require_keywords': ['535d', '535 d', '535'],
+        'exclude_keywords': ['f10', 'g30', 'touring', 'estate']
     },
     'bmw_f30_330d': {
-        'search_terms': ['BMW 330d', 'F30 330d', '330d Sport', '330d M-Sport'],
+        'search_terms': ['BMW 330d', 'BMW 3 Series 330d', 'F30 330d', '330d M-Sport'],
         'make': 'BMW', 'model': '3 Series',
         'max_price': 18000,
         'ni_markup': 3000,
         'min_profit': 1000,
         'avg_uk_price': 12000,
-        'avg_ni_price': 15000
+        'avg_ni_price': 15000,
+        'year_min': 2012, 'year_max': 2019,
+        'require_keywords': ['330d', '330 d'],
+        'exclude_keywords': ['e46', 'e90', 'g20', 'touring', 'estate']
     },
     'bmw_f30_335d': {
-        'search_terms': ['BMW 335d', 'F30 335d', '335d M-Sport', '335d xDrive'],
+        'search_terms': ['BMW 335d', 'BMW 3 Series 335d', 'F30 335d', '335d xDrive'],
         'make': 'BMW', 'model': '3 Series',
         'max_price': 22000,
         'ni_markup': 3500,
         'min_profit': 1000,
         'avg_uk_price': 15000,
-        'avg_ni_price': 18500
+        'avg_ni_price': 18500,
+        'year_min': 2012, 'year_max': 2019,
+        'require_keywords': ['335d', '335 d'],
+        'exclude_keywords': ['e90', 'g20', 'touring', 'estate']
     }
 }
 
 # Fallback images per model (Wikimedia Commons / free stock)
 MODEL_IMAGES = {
     'peugeot_306_dturbo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Peugeot_306_front_20080822.jpg/640px-Peugeot_306_front_20080822.jpg',
-    'lexus_is200': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg/640px-1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg',
-    'bmw_e46_330': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/BMW_E46_Coup%C3%A9_front_20080111.jpg/640px-BMW_E46_Coup%C3%A9_front_20080111.jpg',
+    'lexus_is200_sport': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg/640px-1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg',
+    'bmw_e46_330ci': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/BMW_E46_Coup%C3%A9_front_20080111.jpg/640px-BMW_E46_Coup%C3%A9_front_20080111.jpg',
+    'lexus_is250_sport': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg/640px-1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg',
+    'bmw_e46_m3': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/BMW_M3_E46_%282%29.jpg/640px-BMW_M3_E46_%282%29.jpg',
     'honda_civic_ep3_type_r': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Honda_Civic_Type_R_%28EP3%29.jpg/640px-Honda_Civic_Type_R_%28EP3%29.jpg',
     'bmw_e60_530d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/BMW_E60_front_20080417.jpg/640px-BMW_E60_front_20080417.jpg',
     'bmw_e60_535d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/BMW_E60_front_20080417.jpg/640px-BMW_E60_front_20080417.jpg',
@@ -262,6 +306,12 @@ class CarListing:
                 if kw.lower() in title_lower:
                     return False
 
+        # Check require keywords (e.g. IS200 must have 'sport', 306 must have 'd-turbo')
+        require_keywords = car_config.get('require_keywords', [])
+        if require_keywords:
+            if not any(kw.lower() in title_lower for kw in require_keywords):
+                return False
+
         # Check year range if specified (e.g. EP3 = 2001-2005 only)
         year_min = car_config.get('year_min')
         year_max = car_config.get('year_max')
@@ -387,8 +437,11 @@ class AutoTraderScraper:
     def _get_keyword(self, model_type, search_term):
         """Get keyword filter for specific sub-models"""
         keywords = {
-            'peugeot_306_dturbo': 'turbo',
-            'bmw_e46_330': '330',
+            'peugeot_306_dturbo': 'd turbo',
+            'lexus_is200_sport': 'IS200 sport',
+            'lexus_is250_sport': 'IS250 sport',
+            'bmw_e46_330ci': '330ci',
+            'bmw_e46_m3': 'M3',
             'bmw_e60_530d': '530d',
             'bmw_e60_535d': '535d',
             'bmw_f30_330d': '330d',
@@ -894,9 +947,11 @@ class PistonHeadsScraper:
         model_name = config.get('model', '').lower()
         # Additional keywords to match the right model
         model_keywords = {
-            'peugeot_306_dturbo': ['306'],
-            'lexus_is200': ['is200', 'is 200', 'is-200'],
-            'bmw_e46_330': ['330i', '330ci', '330'],
+            'peugeot_306_dturbo': ['306', 'd-turbo', 'dturbo', 'd turbo'],
+            'lexus_is200_sport': ['is200', 'is 200', 'is-200'],
+            'lexus_is250_sport': ['is250', 'is 250', 'is-250'],
+            'bmw_e46_330ci': ['330ci', '330 ci', '330 coupe'],
+            'bmw_e46_m3': ['m3'],
             'honda_civic_ep3_type_r': ['civic', 'type r', 'type-r'],
             'bmw_e60_530d': ['530d', '530'],
             'bmw_e60_535d': ['535d', '535'],
@@ -977,9 +1032,11 @@ class PistonHeadsScraper:
 
         # Build model matching keywords (same as Apollo parser)
         model_keywords = {
-            'peugeot_306_dturbo': ['306'],
-            'lexus_is200': ['is200', 'is 200', 'is-200'],
-            'bmw_e46_330': ['330i', '330ci', '330 ', 'e46'],
+            'peugeot_306_dturbo': ['306', 'd-turbo', 'dturbo', 'd turbo'],
+            'lexus_is200_sport': ['is200', 'is 200', 'is-200'],
+            'lexus_is250_sport': ['is250', 'is 250', 'is-250'],
+            'bmw_e46_330ci': ['330ci', '330 ci', '330 coupe', 'e46'],
+            'bmw_e46_m3': ['m3', 'e46'],
             'honda_civic_ep3_type_r': ['civic', 'type r', 'type-r'],
             'bmw_e60_530d': ['530d', '530 '],
             'bmw_e60_535d': ['535d', '535 '],

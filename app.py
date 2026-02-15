@@ -438,8 +438,10 @@ var allDeals = [];
 
 var modelLabels = {
     'peugeot_306_dturbo': 'Peugeot 306 D-Turbo',
-    'lexus_is200': 'Lexus IS200',
-    'bmw_e46_330': 'BMW E46 330i/ci',
+    'lexus_is200_sport': 'Lexus IS200 Sport',
+    'lexus_is250_sport': 'Lexus IS250 Sport',
+    'bmw_e46_330ci': 'BMW E46 330ci',
+    'bmw_e46_m3': 'BMW E46 M3',
     'honda_civic_ep3_type_r': 'Honda Civic EP3 Type R',
     'bmw_e60_530d': 'BMW E60 530d',
     'bmw_e60_535d': 'BMW E60 535d',
@@ -449,8 +451,10 @@ var modelLabels = {
 
 var fallbackImages = {
     'peugeot_306_dturbo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Peugeot_306_front_20080822.jpg/640px-Peugeot_306_front_20080822.jpg',
-    'lexus_is200': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg/640px-1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg',
-    'bmw_e46_330': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/BMW_E46_Coup%C3%A9_front_20080111.jpg/640px-BMW_E46_Coup%C3%A9_front_20080111.jpg',
+    'lexus_is200_sport': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg/640px-1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg',
+    'lexus_is250_sport': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg/640px-1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg',
+    'bmw_e46_330ci': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/BMW_E46_Coup%C3%A9_front_20080111.jpg/640px-BMW_E46_Coup%C3%A9_front_20080111.jpg',
+    'bmw_e46_m3': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/BMW_M3_E46_%282%29.jpg/640px-BMW_M3_E46_%282%29.jpg',
     'honda_civic_ep3_type_r': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Honda_Civic_Type_R_%28EP3%29.jpg/640px-Honda_Civic_Type_R_%28EP3%29.jpg',
     'bmw_e60_530d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/BMW_E60_front_20080417.jpg/640px-BMW_E60_front_20080417.jpg',
     'bmw_e60_535d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/BMW_E60_front_20080417.jpg/640px-BMW_E60_front_20080417.jpg',
