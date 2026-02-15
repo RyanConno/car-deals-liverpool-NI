@@ -1,0 +1,15 @@
+[Unit]
+Description=Car Arbitrage Web Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/car-arbitrage
+Environment="PATH=/home/ubuntu/car-arbitrage/venv/bin"
+ExecStart=/home/ubuntu/car-arbitrage/venv/bin/python app.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
