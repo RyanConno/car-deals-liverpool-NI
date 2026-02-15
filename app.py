@@ -685,7 +685,7 @@ function filterDeals() {
         html += '<div class="deal-card">';
         html += '<div class="deal-img">';
         if (imgUrl) {
-            html += '<img src="' + escAttr(imgUrl) + '" alt="' + escAttr(d.title) + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="this.onerror=null;if(this.src.indexOf(\'image-proxy\')>-1){this.src=\'' + escAttr(fallbackSrc).replace(/'/g, "\\'") + '\';}else{this.parentElement.innerHTML=\'<div class=no-img>No Image</div>\';}">';
+            html += '<img src="' + escAttr(imgUrl) + '" alt="' + escAttr(d.title) + '" data-fallback="' + escAttr(fallbackSrc) + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="imgError(this)">';
         } else {
             html += '<div class="no-img">No Image</div>';
         }
@@ -737,6 +737,15 @@ function escHtml(s) {
 function escAttr(s) {
     if (!s) return '';
     return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+}
+
+function imgError(el) {
+    el.onerror = null;
+    if (el.src.indexOf('image-proxy') > -1) {
+        var fb = el.getAttribute('data-fallback');
+        if (fb) { el.src = fb; return; }
+    }
+    el.parentElement.innerHTML = '<div class="no-img">No Image</div>';
 }
 
 // Load deals on page load
