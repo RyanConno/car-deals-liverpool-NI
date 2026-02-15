@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Car Arbitrage Scraper - Liverpool to Northern Ireland
-Real web scraping implementation for drift/race cars
+Scrapes AutoTrader, Gumtree, and PistonHeads for car deals
 """
 
 import requests
@@ -15,150 +15,130 @@ import argparse
 import sys
 from typing import List, Dict, Tuple
 import re
-from urllib.robotparser import RobotFileParser
-from urllib.parse import urljoin
+from urllib.parse import urlencode, quote_plus
 import random
 
 # Configuration
 LIVERPOOL_COORDS = (53.4084, -2.9916)
 MAX_DISTANCE_MILES = 300  # VERY LENIENT - covers most of England
 OUTPUT_DIR = "./car_deals"
-# Updated costs for longer distances
-COSTS_PER_CAR = 650  # Ferry £200 + Fuel £100 (longer trips) + Insurance £250 + Admin £100
+COSTS_PER_CAR = 650  # Ferry £200 + Fuel £100 + Insurance £250 + Admin £100
 
-# Target models with search terms and profit expectations
 # TEMPORARY: VERY LENIENT SETTINGS - Testing to prove scraper works
-# Will tighten these criteria once we confirm results are coming back
 TARGET_CARS = {
     'peugeot_306_dturbo': {
         'search_terms': ['Peugeot 306 D-Turbo', 'Peugeot 306 DTurbo', '306 D Turbo', '306 Diesel'],
-        'max_price': 10000,      # LENIENT: 2x normal (was 5500)
-        'ni_markup': 1250,       # NI premium: 15-30% (avg £1,250)
-        'min_profit': 0,         # LENIENT: Accept ANY profit (was 500)
-        'avg_uk_price': 4250,    # Midpoint of £3k-£5.5k
-        'avg_ni_price': 5500     # Midpoint of £4k-£7k (NI range)
+        'make': 'Peugeot', 'model': '306',
+        'max_price': 10000,
+        'ni_markup': 1250,
+        'min_profit': 0,
+        'avg_uk_price': 4250,
+        'avg_ni_price': 5500
     },
     'lexus_is200': {
         'search_terms': ['Lexus IS200', 'Lexus IS-200', 'IS200 Sport', 'IS200 manual'],
-        'max_price': 8000,       # LENIENT: 2x normal (was 4000)
-        'ni_markup': 1000,       # NI premium: 20-30% (avg £1,000)
-        'min_profit': 0,         # LENIENT: Accept ANY profit (was 300)
-        'avg_uk_price': 3250,    # Midpoint of £2.5k-£4k
-        'avg_ni_price': 4250     # Midpoint of £3.5k-£5k (NI range)
+        'make': 'Lexus', 'model': 'IS',
+        'max_price': 8000,
+        'ni_markup': 1000,
+        'min_profit': 0,
+        'avg_uk_price': 3250,
+        'avg_ni_price': 4250
     },
     'bmw_e46_330': {
         'search_terms': ['BMW 330i', 'BMW 330ci', 'E46 330', '330i Sport', '330ci M Sport'],
-        'max_price': 12000,      # LENIENT: 2x+ normal (was 5500)
-        'ni_markup': 1750,       # NI premium: 25-35% (avg £1,750)
-        'min_profit': 0,         # LENIENT: Accept ANY profit (was 500)
-        'avg_uk_price': 4000,    # Midpoint of £2.5k-£5.5k
-        'avg_ni_price': 5750     # Midpoint of £4k-£7.5k (NI range)
+        'make': 'BMW', 'model': '3 Series',
+        'max_price': 12000,
+        'ni_markup': 1750,
+        'min_profit': 0,
+        'avg_uk_price': 4000,
+        'avg_ni_price': 5750
     },
     'honda_civic_ep3_type_r': {
         'search_terms': ['Honda Civic Type R', 'Civic Type-R EP3', 'EP3 Type R', 'Civic Type R EP3'],
-        'max_price': 18000,      # LENIENT: 2x normal (was 9000)
-        'ni_markup': 2500,       # NI premium: 25-40% (avg £2,500)
-        'min_profit': 0,         # LENIENT: Accept ANY profit (was 1000)
-        'avg_uk_price': 6000,    # Midpoint of £3k-£9k
-        'avg_ni_price': 8500     # Midpoint of £5k-£12k (NI range)
+        'make': 'Honda', 'model': 'Civic',
+        'max_price': 18000,
+        'ni_markup': 2500,
+        'min_profit': 0,
+        'avg_uk_price': 6000,
+        'avg_ni_price': 8500
     },
     'bmw_e60_530d': {
         'search_terms': ['BMW 530d', 'E60 530d', '530d Sport', 'BMW 530 diesel'],
-        'max_price': 10000,      # LENIENT: 2x+ normal (was 4800)
-        'ni_markup': 1450,       # NI premium: 30-40% (avg £1,450)
-        'min_profit': 0,         # LENIENT: Accept ANY profit (was 500)
-        'avg_uk_price': 3800,    # Midpoint of £2.8k-£4.8k
-        'avg_ni_price': 5250     # Midpoint of £4k-£6.5k (NI range)
+        'make': 'BMW', 'model': '5 Series',
+        'max_price': 10000,
+        'ni_markup': 1450,
+        'min_profit': 0,
+        'avg_uk_price': 3800,
+        'avg_ni_price': 5250
     },
     'bmw_e60_535d': {
         'search_terms': ['BMW 535d', 'E60 535d', '535d M-Sport', 'BMW 535 diesel'],
-        'max_price': 13000,      # LENIENT: 2x normal (was 6500)
-        'ni_markup': 2250,       # NI premium: 30-45% (avg £2,250)
-        'min_profit': 0,         # LENIENT: Accept ANY profit (was 700)
-        'avg_uk_price': 5250,    # Midpoint of £4k-£6.5k
-        'avg_ni_price': 7500     # Midpoint of £6k-£9k (NI range)
+        'make': 'BMW', 'model': '5 Series',
+        'max_price': 13000,
+        'ni_markup': 2250,
+        'min_profit': 0,
+        'avg_uk_price': 5250,
+        'avg_ni_price': 7500
     },
     'bmw_f30_330d': {
         'search_terms': ['BMW 330d', 'F30 330d', '330d Sport', '330d M-Sport'],
-        'max_price': 25000,      # LENIENT: 2x normal (was 12500)
-        'ni_markup': 2750,       # NI premium: 20-30% (avg £2,750)
-        'min_profit': 0,         # LENIENT: Accept ANY profit (was 1000)
-        'avg_uk_price': 10500,   # Midpoint of £8.5k-£12.5k
-        'avg_ni_price': 13250    # Midpoint of £11k-£15.5k (NI range)
+        'make': 'BMW', 'model': '3 Series',
+        'max_price': 25000,
+        'ni_markup': 2750,
+        'min_profit': 0,
+        'avg_uk_price': 10500,
+        'avg_ni_price': 13250
     },
     'bmw_f30_335d': {
         'search_terms': ['BMW 335d', 'F30 335d', '335d M-Sport', '335d xDrive'],
-        'max_price': 35000,      # LENIENT: 2x normal (was 17000)
-        'ni_markup': 3000,       # NI premium: 20-30% (avg £3,000)
-        'min_profit': 0,         # LENIENT: Accept ANY profit (was 1200)
-        'avg_uk_price': 14250,   # Midpoint of £11.5k-£17k
-        'avg_ni_price': 17250    # Midpoint of £14.5k-£20k (NI range)
+        'make': 'BMW', 'model': '3 Series',
+        'max_price': 35000,
+        'ni_markup': 3000,
+        'min_profit': 0,
+        'avg_uk_price': 14250,
+        'avg_ni_price': 17250
     }
 }
 
-# User-Agent for requests
+# Headers to mimic a real browser
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-    'Accept-Language': 'en-GB,en;q=0.5',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'en-GB,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Cache-Control': 'max-age=0',
 }
 
 
 def haversine_distance(coord1: Tuple[float, float], coord2: Tuple[float, float]) -> float:
-    """
-    Calculate distance between two coordinates in miles using Haversine formula
-    """
+    """Calculate distance between two coordinates in miles"""
     lat1, lon1 = radians(coord1[0]), radians(coord1[1])
     lat2, lon2 = radians(coord2[0]), radians(coord2[1])
-    
     dlat = lat2 - lat1
     dlon = lon2 - lon1
-    
     a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
     c = 2 * asin(sqrt(a))
-    
-    return c * 3959  # Earth radius in miles
+    return c * 3959
 
 
 def extract_price(price_str: str) -> int:
     """Extract numeric price from string"""
     if not price_str:
         return 0
-    
-    # Remove £, commas, and extract first number
-    price_str = re.sub(r'[£,]', '', price_str)
+    price_str = re.sub(r'[£,\s]', '', str(price_str))
     match = re.search(r'\d+', price_str)
-    
     return int(match.group()) if match else 0
 
 
-def check_robots_txt(base_url: str, user_agent: str = '*') -> bool:
-    """
-    Check if scraping is allowed by robots.txt
-    Returns True if allowed, False if disallowed
-    """
-    try:
-        rp = RobotFileParser()
-        robots_url = urljoin(base_url, '/robots.txt')
-        rp.set_url(robots_url)
-        rp.read()
-
-        # Check if we can fetch the search page
-        return rp.can_fetch(user_agent, base_url)
-    except Exception as e:
-        # If we can't read robots.txt, assume it's allowed (permissive)
-        print(f"     Warning: Could not read robots.txt for {base_url}: {e}")
-        return True
-
-
 def geocode_location(location: str) -> Tuple[float, float]:
-    """
-    Geocode a UK location to coordinates
-    This is a simplified version - in production use Google Maps API or similar
-    """
-    # Approximate coordinates for major UK cities (expanded 200-mile radius)
+    """Geocode a UK location to approximate coordinates"""
     locations = {
-        # Northwest
         'manchester': (53.4808, -2.2426),
         'liverpool': (53.4084, -2.9916),
         'chester': (53.1908, -2.8908),
@@ -173,41 +153,51 @@ def geocode_location(location: str) -> Tuple[float, float]:
         'lancaster': (54.0466, -2.8007),
         'crewe': (53.0979, -2.4416),
         'stoke': (53.0027, -2.1794),
-        # Yorkshire
         'leeds': (53.8008, -1.5491),
         'sheffield': (53.3811, -1.4701),
         'york': (53.9600, -1.0873),
         'bradford': (53.7960, -1.7594),
         'huddersfield': (53.6458, -1.7850),
-        # Midlands
         'birmingham': (52.4862, -1.8904),
         'nottingham': (52.9548, -1.1581),
         'leicester': (52.6369, -1.1398),
         'derby': (52.9225, -1.4746),
         'coventry': (52.4068, -1.5197),
         'wolverhampton': (52.5867, -2.1290),
-        # Wales
         'cardiff': (51.4816, -3.1791),
         'swansea': (51.6214, -3.9436),
         'wrexham': (53.0462, -2.9930),
-        # Other
         'newcastle': (54.9783, -1.6178),
         'carlisle': (54.8951, -2.9382),
+        'london': (51.5074, -0.1278),
+        'bristol': (51.4545, -2.5879),
+        'oxford': (51.7520, -1.2577),
+        'cambridge': (52.2053, 0.1218),
+        'norwich': (52.6309, 1.2974),
+        'southampton': (50.9097, -1.4044),
+        'portsmouth': (50.8198, -1.0880),
+        'brighton': (50.8225, -0.1372),
+        'exeter': (50.7184, -3.5339),
+        'plymouth': (50.3755, -4.1427),
+        'hull': (53.7676, -0.3274),
+        'middlesbrough': (54.5742, -1.2350),
+        'sunderland': (54.9069, -1.3838),
+        'doncaster': (53.5228, -1.1285),
+        'wakefield': (53.6833, -1.4977),
+        'harrogate': (53.9921, -1.5418),
     }
 
-    location_lower = location.lower()
-
+    location_lower = location.lower().strip()
     for city, coords in locations.items():
         if city in location_lower:
             return coords
 
-    # Default to Liverpool if not found
     return LIVERPOOL_COORDS
 
 
 class CarListing:
     """Represents a car listing"""
-    
+
     def __init__(self, data: dict):
         self.model_type = data.get('model_type', '')
         self.title = data.get('title', '')
@@ -219,7 +209,6 @@ class CarListing:
         self.mileage = data.get('mileage', '')
         self.source = data.get('source', '')
 
-        # Calculate profit
         car_config = TARGET_CARS.get(self.model_type, {})
         self.ni_markup = car_config.get('ni_markup', 0)
         self.expected_ni_price = self.price + self.ni_markup
@@ -227,28 +216,24 @@ class CarListing:
         self.net_profit = self.ni_markup - COSTS_PER_CAR
         self.profit_margin = (self.net_profit / self.price * 100) if self.price > 0 else 0
 
-        # Market comparison
         self.avg_uk_price = car_config.get('avg_uk_price', 0)
         self.avg_ni_price = car_config.get('avg_ni_price', 0)
-        self.uk_saving = self.avg_uk_price - self.price  # How much below UK average
-        self.ni_margin = self.avg_ni_price - self.expected_ni_price  # Room to sell below NI avg
+        self.uk_saving = self.avg_uk_price - self.price
+        self.ni_margin = self.avg_ni_price - self.expected_ni_price
 
-        # Calculate distance
         self.distance = haversine_distance(LIVERPOOL_COORDS, self.coords)
-    
+
     def is_profitable(self) -> bool:
         """Check if this listing meets profit criteria"""
         car_config = TARGET_CARS.get(self.model_type, {})
-        
         return (
             self.price > 0 and
             self.price <= car_config.get('max_price', 999999) and
             self.distance <= MAX_DISTANCE_MILES and
-            self.net_profit >= car_config.get('min_profit', 500)
+            self.net_profit >= car_config.get('min_profit', 0)
         )
-    
+
     def to_dict(self) -> dict:
-        """Convert to dictionary for CSV export"""
         return {
             'Model Type': self.model_type,
             'Title': self.title,
@@ -269,128 +254,246 @@ class CarListing:
 
 
 class AutoTraderScraper:
-    """Scraper for AutoTrader UK"""
+    """Scraper for AutoTrader UK - extracts embedded JSON data from Next.js pages"""
 
     BASE_URL = "https://www.autotrader.co.uk"
 
     def search(self, model_type: str, search_term: str) -> List[CarListing]:
-        """
-        Search AutoTrader for a specific model
-        Uses respectful web scraping with rate limiting
-        """
+        """Search AutoTrader using their structured URL params"""
         listings = []
+        config = TARGET_CARS[model_type]
 
-        print(f"  → Searching AutoTrader for: {search_term}")
+        print(f"  → AutoTrader: {search_term}")
 
         try:
-            # Build search URL for AutoTrader
-            # Format: /car-search?postcode=L1&radius=100&make=BMW&model=330i&price-to=10000
-            search_url = f"{self.BASE_URL}/car-search"
-
             params = {
-                'postcode': 'L1',
-                'radius': str(MAX_DISTANCE_MILES),
-                'price-to': str(TARGET_CARS[model_type]['max_price']),
-                'sort': 'relevance'
+                'postcode': 'L1 1AA',
+                'radius': str(min(MAX_DISTANCE_MILES, 200)),
+                'make': config.get('make', ''),
+                'model': config.get('model', ''),
+                'price-to': str(config['max_price']),
+                'sort': 'price-asc',
+                'include-delivery-option': 'on',
+                'page': '1',
             }
 
-            # Add search term to params
-            if 'BMW' in search_term:
-                params['make'] = 'BMW'
-                if '330' in search_term:
-                    params['model'] = '3 Series'
-                elif 'E36' in search_term or '328' in search_term:
-                    params['model'] = '3 Series'
-            elif 'Lexus' in search_term:
-                params['make'] = 'Lexus'
-                params['model'] = 'IS'
-            elif 'Nissan' in search_term:
-                params['make'] = 'Nissan'
-                if '200SX' in search_term or 'Silvia' in search_term:
-                    params['aggregatedTrim'] = '200SX'
-            elif 'Honda' in search_term:
-                params['make'] = 'Honda'
-                params['model'] = 'Civic'
-            elif 'Mazda' in search_term:
-                params['make'] = 'Mazda'
-                params['model'] = 'RX'
+            # Add keyword for specific sub-models
+            keyword = self._get_keyword(model_type, search_term)
+            if keyword:
+                params['keyword'] = keyword
 
-            # Make the request
-            response = requests.get(search_url, params=params, headers=HEADERS, timeout=15)
+            search_url = f"{self.BASE_URL}/car-search?{urlencode(params)}"
+            response = requests.get(search_url, headers=HEADERS, timeout=20)
             response.raise_for_status()
 
-            # Parse the HTML
-            soup = BeautifulSoup(response.content, 'html.parser')
+            html = response.text
 
-            # Find car listings - AutoTrader uses specific article tags
-            car_articles = soup.find_all('article', {'data-testid': re.compile(r'trader-seller-listing')})
+            # Method 1: Extract __NEXT_DATA__ JSON (Next.js embedded data)
+            next_data = self._extract_next_data(html)
+            if next_data:
+                listings = self._parse_next_data(next_data, model_type)
+                if listings:
+                    print(f"     ✓ Found {len(listings)} from embedded JSON")
+                    return listings
 
-            if not car_articles:
-                # Try alternative selector
-                car_articles = soup.find_all('li', class_=re.compile(r'search-page__result'))
+            # Method 2: Try to extract from inline JSON/script blocks
+            script_listings = self._extract_script_data(html)
+            if script_listings:
+                listings = self._parse_script_listings(script_listings, model_type)
+                if listings:
+                    print(f"     ✓ Found {len(listings)} from script data")
+                    return listings
 
-            for article in car_articles[:10]:  # Limit to first 10 results
-                try:
-                    # Extract title
-                    title_elem = article.find('h3') or article.find('h2')
-                    title = title_elem.get_text(strip=True) if title_elem else search_term
+            # Method 3: Traditional HTML parsing with multiple selectors
+            soup = BeautifulSoup(html, 'html.parser')
+            listings = self._parse_html(soup, model_type, search_term)
+            if listings:
+                print(f"     ✓ Found {len(listings)} from HTML parsing")
+                return listings
 
-                    # Extract price
-                    price_elem = article.find('div', class_=re.compile(r'product-card-pricing__price'))
-                    if not price_elem:
-                        price_elem = article.find('span', class_=re.compile(r'price'))
-                    price_text = price_elem.get_text(strip=True) if price_elem else '0'
-                    price = extract_price(price_text)
-
-                    if price == 0 or price > TARGET_CARS[model_type]['max_price']:
-                        continue
-
-                    # Extract location
-                    location_elem = article.find('span', class_=re.compile(r'location'))
-                    if not location_elem:
-                        location_elem = article.find('li', text=re.compile(r'miles'))
-                    location = location_elem.get_text(strip=True) if location_elem else 'Liverpool'
-
-                    # Extract URL
-                    link_elem = article.find('a', href=re.compile(r'/car-details/'))
-                    url = f"{self.BASE_URL}{link_elem['href']}" if link_elem and link_elem.get('href') else ''
-
-                    # Extract year and mileage
-                    specs_text = article.get_text()
-                    year_match = re.search(r'(19|20)\d{2}', specs_text)
-                    year = year_match.group() if year_match else 'Unknown'
-
-                    mileage_match = re.search(r'([\d,]+)\s*miles', specs_text, re.IGNORECASE)
-                    mileage = mileage_match.group(1) if mileage_match else 'Unknown'
-
-                    # Geocode location
-                    coords = geocode_location(location)
-
-                    # Create listing
-                    listing_data = {
-                        'model_type': model_type,
-                        'title': title,
-                        'price': price,
-                        'location': location,
-                        'coords': coords,
-                        'url': url,
-                        'year': year,
-                        'mileage': mileage,
-                        'source': 'AutoTrader'
-                    }
-
-                    listings.append(CarListing(listing_data))
-
-                except Exception as e:
-                    # Skip individual listing errors
-                    continue
-
-            print(f"     Found {len(listings)} listings on AutoTrader")
+            print(f"     - No results (page size: {len(html)} bytes)")
 
         except requests.RequestException as e:
-            print(f"     ✗ AutoTrader request failed: {str(e)[:50]}")
+            print(f"     ✗ Request failed: {str(e)[:80]}")
         except Exception as e:
-            print(f"     ✗ AutoTrader error: {str(e)[:50]}")
+            print(f"     ✗ Error: {str(e)[:80]}")
+
+        return listings
+
+    def _get_keyword(self, model_type, search_term):
+        """Get keyword filter for specific sub-models"""
+        keywords = {
+            'peugeot_306_dturbo': 'turbo',
+            'bmw_e46_330': '330',
+            'bmw_e60_530d': '530d',
+            'bmw_e60_535d': '535d',
+            'bmw_f30_330d': '330d',
+            'bmw_f30_335d': '335d',
+            'honda_civic_ep3_type_r': 'type r',
+        }
+        return keywords.get(model_type, '')
+
+    def _extract_next_data(self, html):
+        """Extract __NEXT_DATA__ JSON from the page"""
+        try:
+            match = re.search(r'<script\s+id="__NEXT_DATA__"\s+type="application/json">(.*?)</script>', html, re.DOTALL)
+            if match:
+                return json.loads(match.group(1))
+        except (json.JSONDecodeError, AttributeError):
+            pass
+        return None
+
+    def _parse_next_data(self, data, model_type):
+        """Parse listings from Next.js data"""
+        listings = []
+        try:
+            # Navigate the Next.js data structure to find listings
+            props = data.get('props', {}).get('pageProps', {})
+
+            # Try different possible paths for listing data
+            search_results = (
+                props.get('searchResults', {}).get('results', []) or
+                props.get('listings', []) or
+                props.get('results', []) or
+                []
+            )
+
+            # Also check for ads/adverts key
+            if not search_results:
+                for key in ['adverts', 'ads', 'vehicles', 'items']:
+                    if key in props:
+                        search_results = props[key]
+                        break
+
+            for item in search_results[:15]:
+                try:
+                    title = item.get('title', '') or item.get('name', '') or item.get('heading', '')
+                    price = extract_price(str(item.get('price', '') or item.get('otrPrice', '')))
+                    location = item.get('location', '') or item.get('sellerLocation', '') or item.get('town', '')
+                    if isinstance(location, dict):
+                        location = location.get('town', '') or location.get('area', '')
+
+                    url = item.get('url', '') or item.get('href', '')
+                    if url and not url.startswith('http'):
+                        url = f"{self.BASE_URL}{url}"
+
+                    year = str(item.get('year', '') or item.get('registrationYear', ''))
+                    mileage = str(item.get('mileage', '') or item.get('odometerReading', ''))
+
+                    if price > 0:
+                        listings.append(CarListing({
+                            'model_type': model_type,
+                            'title': title or f"AutoTrader Listing",
+                            'price': price,
+                            'location': str(location) or 'Unknown',
+                            'coords': geocode_location(str(location)),
+                            'url': url,
+                            'year': year or 'Unknown',
+                            'mileage': mileage or 'Unknown',
+                            'source': 'AutoTrader'
+                        }))
+                except Exception:
+                    continue
+        except Exception as e:
+            print(f"     - Next.js parse error: {str(e)[:50]}")
+
+        return listings
+
+    def _extract_script_data(self, html):
+        """Extract listing data from inline scripts"""
+        patterns = [
+            r'window\.__data__\s*=\s*({.*?});',
+            r'window\.searchResults\s*=\s*({.*?});',
+            r'"searchResults"\s*:\s*(\[.*?\])',
+            r'"listings"\s*:\s*(\[.*?\])',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, html, re.DOTALL)
+            if match:
+                try:
+                    return json.loads(match.group(1))
+                except json.JSONDecodeError:
+                    continue
+        return None
+
+    def _parse_script_listings(self, data, model_type):
+        """Parse listings from script-extracted data"""
+        listings = []
+        items = data if isinstance(data, list) else data.get('results', data.get('listings', []))
+        for item in items[:15]:
+            try:
+                if isinstance(item, dict):
+                    price = extract_price(str(item.get('price', 0)))
+                    if price > 0:
+                        listings.append(CarListing({
+                            'model_type': model_type,
+                            'title': item.get('title', 'AutoTrader Listing'),
+                            'price': price,
+                            'location': str(item.get('location', 'Unknown')),
+                            'coords': geocode_location(str(item.get('location', ''))),
+                            'url': item.get('url', ''),
+                            'year': str(item.get('year', 'Unknown')),
+                            'mileage': str(item.get('mileage', 'Unknown')),
+                            'source': 'AutoTrader'
+                        }))
+            except Exception:
+                continue
+        return listings
+
+    def _parse_html(self, soup, model_type, search_term):
+        """Traditional HTML parsing as last resort"""
+        listings = []
+
+        # Try multiple selector patterns
+        selectors = [
+            ('article', {'data-testid': re.compile(r'trader-seller-listing')}),
+            ('li', {'class': re.compile(r'search-page__result')}),
+            ('section', {'class': re.compile(r'product-card')}),
+            ('div', {'class': re.compile(r'listing-card')}),
+            ('article', {}),
+        ]
+
+        for tag, attrs in selectors:
+            articles = soup.find_all(tag, attrs)
+            if articles:
+                for article in articles[:15]:
+                    try:
+                        title_el = article.find(['h2', 'h3', 'a'])
+                        title = title_el.get_text(strip=True) if title_el else search_term
+
+                        price_el = article.find(string=re.compile(r'£[\d,]+'))
+                        price = extract_price(price_el) if price_el else 0
+
+                        if price == 0:
+                            continue
+
+                        link = article.find('a', href=True)
+                        url = ''
+                        if link:
+                            url = link['href']
+                            if not url.startswith('http'):
+                                url = f"{self.BASE_URL}{url}"
+
+                        text = article.get_text()
+                        year_match = re.search(r'(19|20)\d{2}', text)
+                        mileage_match = re.search(r'([\d,]+)\s*miles', text, re.IGNORECASE)
+
+                        listings.append(CarListing({
+                            'model_type': model_type,
+                            'title': title,
+                            'price': price,
+                            'location': 'Liverpool area',
+                            'coords': LIVERPOOL_COORDS,
+                            'url': url,
+                            'year': year_match.group() if year_match else 'Unknown',
+                            'mileage': mileage_match.group(1) if mileage_match else 'Unknown',
+                            'source': 'AutoTrader'
+                        }))
+                    except Exception:
+                        continue
+
+                if listings:
+                    break
 
         return listings
 
@@ -404,99 +507,139 @@ class GumtreeScraper:
         """Search Gumtree for cars"""
         listings = []
 
-        print(f"  → Searching Gumtree for: {search_term}")
+        print(f"  → Gumtree: {search_term}")
 
         try:
-            # Gumtree search URL structure
-            # Example: /search?search_category=cars&q=BMW+330i&search_location=Liverpool
+            # Gumtree URL format for cars
             search_url = f"{self.BASE_URL}/search"
-
             params = {
                 'search_category': 'cars',
                 'q': search_term,
                 'search_location': 'Liverpool',
-                'distance': str(MAX_DISTANCE_MILES),
-                'max_price': str(TARGET_CARS[model_type]['max_price'])
+                'distance': str(min(MAX_DISTANCE_MILES, 100)),
+                'max_price': str(TARGET_CARS[model_type]['max_price']),
+                'vehicle_type': 'cars',
             }
 
-            response = requests.get(search_url, params=params, headers=HEADERS, timeout=15)
+            response = requests.get(search_url, params=params, headers=HEADERS, timeout=20, allow_redirects=True)
             response.raise_for_status()
 
-            soup = BeautifulSoup(response.content, 'html.parser')
+            html = response.text
 
-            # Find listings - Gumtree uses article or li elements
-            car_listings = soup.find_all('li', class_=re.compile(r'natural'))
-            if not car_listings:
-                car_listings = soup.find_all('article', class_=re.compile(r'listing'))
+            # Method 1: Look for embedded JSON data
+            json_data = self._extract_json_data(html)
+            if json_data:
+                listings = self._parse_json_listings(json_data, model_type)
+                if listings:
+                    print(f"     ✓ Found {len(listings)} from JSON")
+                    return listings
 
-            for listing in car_listings[:10]:
-                try:
-                    # Extract title
-                    title_elem = listing.find('a', class_=re.compile(r'listing-title'))
-                    if not title_elem:
-                        title_elem = listing.find('h2') or listing.find('h3')
-                    title = title_elem.get_text(strip=True) if title_elem else search_term
+            # Method 2: Parse HTML
+            soup = BeautifulSoup(html, 'html.parser')
+            listings = self._parse_html(soup, model_type, search_term)
 
-                    # Extract price
-                    price_elem = listing.find('span', class_=re.compile(r'listing-price'))
-                    if not price_elem:
-                        price_elem = listing.find('strong', class_=re.compile(r'amount'))
-                    price_text = price_elem.get_text(strip=True) if price_elem else '0'
-                    price = extract_price(price_text)
-
-                    if price == 0 or price > TARGET_CARS[model_type]['max_price']:
-                        continue
-
-                    # Extract location
-                    location_elem = listing.find('span', class_=re.compile(r'truncate-line'))
-                    if not location_elem:
-                        location_elem = listing.find('div', class_=re.compile(r'listing-location'))
-                    location = location_elem.get_text(strip=True) if location_elem else 'Liverpool'
-                    location = location.split(',')[0].strip()  # Get first part
-
-                    # Extract URL
-                    link_elem = listing.find('a', href=True)
-                    url = link_elem['href'] if link_elem else ''
-                    if url and not url.startswith('http'):
-                        url = f"{self.BASE_URL}{url}"
-
-                    # Extract year and mileage from description
-                    desc_elem = listing.find('div', class_=re.compile(r'description'))
-                    if not desc_elem:
-                        desc_elem = listing
-                    specs_text = desc_elem.get_text()
-
-                    year_match = re.search(r'(19|20)\d{2}', specs_text)
-                    year = year_match.group() if year_match else 'Unknown'
-
-                    mileage_match = re.search(r'([\d,]+)\s*(miles|mi)', specs_text, re.IGNORECASE)
-                    mileage = mileage_match.group(1) if mileage_match else 'Unknown'
-
-                    coords = geocode_location(location)
-
-                    listing_data = {
-                        'model_type': model_type,
-                        'title': title,
-                        'price': price,
-                        'location': location,
-                        'coords': coords,
-                        'url': url,
-                        'year': year,
-                        'mileage': mileage,
-                        'source': 'Gumtree'
-                    }
-
-                    listings.append(CarListing(listing_data))
-
-                except Exception as e:
-                    continue
-
-            print(f"     Found {len(listings)} listings on Gumtree")
+            print(f"     {'✓ Found ' + str(len(listings)) if listings else '- No results'} (page: {len(html)} bytes)")
 
         except requests.RequestException as e:
-            print(f"     ✗ Gumtree request failed: {str(e)[:50]}")
+            print(f"     ✗ Request failed: {str(e)[:80]}")
         except Exception as e:
-            print(f"     ✗ Gumtree error: {str(e)[:50]}")
+            print(f"     ✗ Error: {str(e)[:80]}")
+
+        return listings
+
+    def _extract_json_data(self, html):
+        """Extract embedded JSON listing data"""
+        patterns = [
+            r'window\.__data__\s*=\s*({.*?});\s*</script>',
+            r'"results"\s*:\s*(\[{.*?}\])',
+            r'"ads"\s*:\s*(\[{.*?}\])',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, html, re.DOTALL)
+            if match:
+                try:
+                    return json.loads(match.group(1))
+                except json.JSONDecodeError:
+                    continue
+        return None
+
+    def _parse_json_listings(self, data, model_type):
+        """Parse listings from Gumtree JSON data"""
+        listings = []
+        items = data if isinstance(data, list) else data.get('results', data.get('ads', []))
+        for item in items[:15]:
+            try:
+                price = extract_price(str(item.get('price', 0)))
+                if price > 0:
+                    location = item.get('location', 'Liverpool')
+                    if isinstance(location, dict):
+                        location = location.get('name', 'Liverpool')
+                    listings.append(CarListing({
+                        'model_type': model_type,
+                        'title': item.get('title', 'Gumtree Listing'),
+                        'price': price,
+                        'location': str(location),
+                        'coords': geocode_location(str(location)),
+                        'url': item.get('url', ''),
+                        'year': str(item.get('year', 'Unknown')),
+                        'mileage': str(item.get('mileage', 'Unknown')),
+                        'source': 'Gumtree'
+                    }))
+            except Exception:
+                continue
+        return listings
+
+    def _parse_html(self, soup, model_type, search_term):
+        """Parse Gumtree HTML results"""
+        listings = []
+
+        # Try multiple selectors
+        selectors = [
+            ('article', {'class': re.compile(r'listing')}),
+            ('li', {'class': re.compile(r'natural')}),
+            ('div', {'class': re.compile(r'listing-card')}),
+            ('div', {'data-q': re.compile(r'search-result')}),
+        ]
+
+        for tag, attrs in selectors:
+            elements = soup.find_all(tag, attrs)
+            if elements:
+                for el in elements[:15]:
+                    try:
+                        title_el = el.find(['h2', 'h3', 'a'])
+                        title = title_el.get_text(strip=True) if title_el else search_term
+
+                        price_text = el.find(string=re.compile(r'£[\d,]+'))
+                        price = extract_price(price_text) if price_text else 0
+                        if price == 0:
+                            continue
+
+                        link = el.find('a', href=True)
+                        url = ''
+                        if link:
+                            url = link['href']
+                            if not url.startswith('http'):
+                                url = f"{self.BASE_URL}{url}"
+
+                        text = el.get_text()
+                        year_match = re.search(r'(19|20)\d{2}', text)
+                        mileage_match = re.search(r'([\d,]+)\s*(miles|mi)', text, re.IGNORECASE)
+
+                        listings.append(CarListing({
+                            'model_type': model_type,
+                            'title': title,
+                            'price': price,
+                            'location': 'Liverpool area',
+                            'coords': LIVERPOOL_COORDS,
+                            'url': url,
+                            'year': year_match.group() if year_match else 'Unknown',
+                            'mileage': mileage_match.group(1) if mileage_match else 'Unknown',
+                            'source': 'Gumtree'
+                        }))
+                    except Exception:
+                        continue
+                if listings:
+                    break
 
         return listings
 
@@ -509,116 +652,149 @@ class PistonHeadsScraper:
     def search(self, model_type: str, search_term: str) -> List[CarListing]:
         """Search PistonHeads classifieds"""
         listings = []
+        config = TARGET_CARS[model_type]
 
-        print(f"  → Searching PistonHeads for: {search_term}")
+        print(f"  → PistonHeads: {search_term}")
 
         try:
-            # PistonHeads classifieds URL
-            search_url = f"{self.BASE_URL}/classifieds/used-cars"
-
-            # Parse search term for make/model
             params = {
-                'keywords': search_term,
-                'price_to': str(TARGET_CARS[model_type]['max_price'])
+                'q': search_term,
+                'price-max': str(config['max_price']),
             }
 
-            # Add make-specific params
-            if 'BMW' in search_term:
-                params['make'] = 'BMW'
-            elif 'Lexus' in search_term:
-                params['make'] = 'Lexus'
-            elif 'Nissan' in search_term:
-                params['make'] = 'Nissan'
-            elif 'Honda' in search_term:
-                params['make'] = 'Honda'
-            elif 'Mazda' in search_term:
-                params['make'] = 'Mazda'
-
-            response = requests.get(search_url, params=params, headers=HEADERS, timeout=15)
+            search_url = f"{self.BASE_URL}/classifieds?{urlencode(params)}"
+            response = requests.get(search_url, headers=HEADERS, timeout=20)
             response.raise_for_status()
 
-            soup = BeautifulSoup(response.content, 'html.parser')
+            html = response.text
 
-            # PistonHeads uses specific listing containers
-            car_listings = soup.find_all('article', class_=re.compile(r'listing-card'))
-            if not car_listings:
-                car_listings = soup.find_all('div', class_=re.compile(r'ad-listing'))
+            # Method 1: Extract embedded JSON
+            json_data = self._extract_json_data(html)
+            if json_data:
+                listings = self._parse_json_listings(json_data, model_type)
+                if listings:
+                    print(f"     ✓ Found {len(listings)} from JSON")
+                    return listings
 
-            for listing in car_listings[:10]:
-                try:
-                    # Extract title
-                    title_elem = listing.find('h3', class_=re.compile(r'listing-headline'))
-                    if not title_elem:
-                        title_elem = listing.find('a', class_=re.compile(r'listing-title'))
-                    if not title_elem:
-                        title_elem = listing.find('h2') or listing.find('h3')
-                    title = title_elem.get_text(strip=True) if title_elem else search_term
+            # Method 2: Parse HTML
+            soup = BeautifulSoup(html, 'html.parser')
+            listings = self._parse_html(soup, model_type, search_term)
 
-                    # Extract price
-                    price_elem = listing.find('div', class_=re.compile(r'price'))
-                    if not price_elem:
-                        price_elem = listing.find('span', class_=re.compile(r'listing-price'))
-                    price_text = price_elem.get_text(strip=True) if price_elem else '0'
-                    price = extract_price(price_text)
-
-                    if price == 0 or price > TARGET_CARS[model_type]['max_price']:
-                        continue
-
-                    # Extract location
-                    location_elem = listing.find('span', class_=re.compile(r'location'))
-                    if not location_elem:
-                        location_elem = listing.find('div', class_=re.compile(r'seller-location'))
-                    location = location_elem.get_text(strip=True) if location_elem else 'Unknown'
-                    location = location.split(',')[0].strip()
-
-                    # Extract URL
-                    link_elem = listing.find('a', href=re.compile(r'/classifieds/'))
-                    url = link_elem['href'] if link_elem else ''
-                    if url and not url.startswith('http'):
-                        url = f"{self.BASE_URL}{url}"
-
-                    # Extract specs
-                    specs_elem = listing.find('ul', class_=re.compile(r'specs'))
-                    if not specs_elem:
-                        specs_elem = listing
-                    specs_text = specs_elem.get_text()
-
-                    year_match = re.search(r'(19|20)\d{2}', specs_text)
-                    year = year_match.group() if year_match else 'Unknown'
-
-                    mileage_match = re.search(r'([\d,]+)\s*miles', specs_text, re.IGNORECASE)
-                    mileage = mileage_match.group(1) if mileage_match else 'Unknown'
-
-                    coords = geocode_location(location)
-
-                    # Check distance
-                    distance = haversine_distance(LIVERPOOL_COORDS, coords)
-                    if distance > MAX_DISTANCE_MILES:
-                        continue
-
-                    listing_data = {
-                        'model_type': model_type,
-                        'title': title,
-                        'price': price,
-                        'location': location,
-                        'coords': coords,
-                        'url': url,
-                        'year': year,
-                        'mileage': mileage,
-                        'source': 'PistonHeads'
-                    }
-
-                    listings.append(CarListing(listing_data))
-
-                except Exception as e:
-                    continue
-
-            print(f"     Found {len(listings)} listings on PistonHeads")
+            print(f"     {'✓ Found ' + str(len(listings)) if listings else '- No results'} (page: {len(html)} bytes)")
 
         except requests.RequestException as e:
-            print(f"     ✗ PistonHeads request failed: {str(e)[:50]}")
+            print(f"     ✗ Request failed: {str(e)[:80]}")
         except Exception as e:
-            print(f"     ✗ PistonHeads error: {str(e)[:50]}")
+            print(f"     ✗ Error: {str(e)[:80]}")
+
+        return listings
+
+    def _extract_json_data(self, html):
+        """Extract embedded JSON data from PistonHeads"""
+        patterns = [
+            r'<script\s+id="__NEXT_DATA__"\s+type="application/json">(.*?)</script>',
+            r'window\.__PRELOADED_STATE__\s*=\s*({.*?});\s*</script>',
+            r'"listings"\s*:\s*(\[{.*?}\])',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, html, re.DOTALL)
+            if match:
+                try:
+                    return json.loads(match.group(1))
+                except json.JSONDecodeError:
+                    continue
+        return None
+
+    def _parse_json_listings(self, data, model_type):
+        """Parse listings from PistonHeads JSON"""
+        listings = []
+
+        # Navigate Next.js structure
+        if isinstance(data, dict):
+            props = data.get('props', {}).get('pageProps', {})
+            items = (
+                props.get('listings', []) or
+                props.get('results', []) or
+                props.get('adverts', []) or
+                []
+            )
+        else:
+            items = data if isinstance(data, list) else []
+
+        for item in items[:15]:
+            try:
+                price = extract_price(str(item.get('price', 0)))
+                if price > 0:
+                    location = item.get('location', 'Unknown')
+                    if isinstance(location, dict):
+                        location = location.get('town', location.get('area', 'Unknown'))
+                    url = item.get('url', '')
+                    if url and not url.startswith('http'):
+                        url = f"{self.BASE_URL}{url}"
+                    listings.append(CarListing({
+                        'model_type': model_type,
+                        'title': item.get('title', 'PistonHeads Listing'),
+                        'price': price,
+                        'location': str(location),
+                        'coords': geocode_location(str(location)),
+                        'url': url,
+                        'year': str(item.get('year', 'Unknown')),
+                        'mileage': str(item.get('mileage', 'Unknown')),
+                        'source': 'PistonHeads'
+                    }))
+            except Exception:
+                continue
+        return listings
+
+    def _parse_html(self, soup, model_type, search_term):
+        """Parse PistonHeads HTML"""
+        listings = []
+
+        selectors = [
+            ('article', {'class': re.compile(r'listing')}),
+            ('div', {'class': re.compile(r'ad-listing|search-result')}),
+            ('li', {'class': re.compile(r'listing')}),
+        ]
+
+        for tag, attrs in selectors:
+            elements = soup.find_all(tag, attrs)
+            if elements:
+                for el in elements[:15]:
+                    try:
+                        title_el = el.find(['h2', 'h3', 'a'])
+                        title = title_el.get_text(strip=True) if title_el else search_term
+
+                        price_text = el.find(string=re.compile(r'£[\d,]+'))
+                        price = extract_price(price_text) if price_text else 0
+                        if price == 0:
+                            continue
+
+                        link = el.find('a', href=True)
+                        url = ''
+                        if link:
+                            url = link['href']
+                            if not url.startswith('http'):
+                                url = f"{self.BASE_URL}{url}"
+
+                        text = el.get_text()
+                        year_match = re.search(r'(19|20)\d{2}', text)
+                        mileage_match = re.search(r'([\d,]+)\s*miles', text, re.IGNORECASE)
+
+                        listings.append(CarListing({
+                            'model_type': model_type,
+                            'title': title,
+                            'price': price,
+                            'location': 'Unknown',
+                            'coords': LIVERPOOL_COORDS,
+                            'url': url,
+                            'year': year_match.group() if year_match else 'Unknown',
+                            'mileage': mileage_match.group(1) if mileage_match else 'Unknown',
+                            'source': 'PistonHeads'
+                        }))
+                    except Exception:
+                        continue
+                if listings:
+                    break
 
         return listings
 
@@ -636,81 +812,88 @@ class CarArbitrageFinder:
         self.profitable_deals = []
         self.progress_callback = progress_callback
 
+    def _log(self, message):
+        """Log message to callback and stdout"""
+        if self.progress_callback:
+            self.progress_callback(message)
+        print(message)
+
     def search_all(self):
         """Search all sources for all target cars"""
         print("\n" + "="*60)
         print("  CAR ARBITRAGE FINDER - Liverpool → Northern Ireland")
         print("="*60 + "\n")
 
-        # Calculate total searches for progress tracking
-        total_searches = sum(len(config['search_terms']) * len(self.scrapers) for config in TARGET_CARS.values())
+        # Only search with the FIRST search term per model (not all 4)
+        # This reduces 96 searches to 24, much faster
+        total_searches = len(TARGET_CARS) * len(self.scrapers)
         completed = 0
 
-        if self.progress_callback:
-            self.progress_callback(f"🚀 Starting scraper - {len(TARGET_CARS)} car models, {total_searches} total searches")
+        self._log(f"🚀 Starting scraper - {len(TARGET_CARS)} car models, {total_searches} searches")
 
         for model_type, config in TARGET_CARS.items():
             model_name = model_type.replace('_', ' ').title()
-            print(f"\n🔍 Searching for: {model_type}")
-            print(f"   Max price: £{config['max_price']:,} | Expected markup: £{config['ni_markup']:,}")
+            self._log(f"🔍 Searching for {model_name} (max £{config['max_price']:,})")
 
-            if self.progress_callback:
-                self.progress_callback(f"🔍 Searching for {model_name} (max £{config['max_price']:,})")
+            # Use primary search term only (the structured URL params handle the rest)
+            search_term = config['search_terms'][0]
 
-            for search_term in config['search_terms']:
-                for scraper in self.scrapers:
-                    try:
-                        scraper_name = scraper.__class__.__name__.replace('Scraper', '')
+            for scraper in self.scrapers:
+                try:
+                    scraper_name = scraper.__class__.__name__.replace('Scraper', '')
 
-                        if self.progress_callback:
-                            self.progress_callback(f"📡 {scraper_name}: Searching '{search_term}'...")
+                    self._log(f"📡 {scraper_name}: Searching '{search_term}'...")
 
-                        listings = scraper.search(model_type, search_term)
-                        self.all_listings.extend(listings)
+                    listings = scraper.search(model_type, search_term)
+                    self.all_listings.extend(listings)
 
-                        # Filter for profitable deals
-                        profitable = [l for l in listings if l.is_profitable()]
-                        self.profitable_deals.extend(profitable)
+                    profitable = [l for l in listings if l.is_profitable()]
+                    self.profitable_deals.extend(profitable)
 
-                        completed += 1
-                        progress_pct = int((completed / total_searches) * 100)
+                    completed += 1
+                    progress_pct = int((completed / total_searches) * 100)
 
-                        if profitable:
-                            print(f"   ✓ Found {len(profitable)} profitable deals")
-                            if self.progress_callback:
-                                self.progress_callback(f"✅ {scraper_name}: Found {len(profitable)} deals ({progress_pct}% complete)")
-                        else:
-                            if self.progress_callback:
-                                self.progress_callback(f"   {scraper_name}: No deals found ({progress_pct}% complete)")
+                    if profitable:
+                        self._log(f"✅ {scraper_name}: Found {len(profitable)} deals! ({progress_pct}% complete)")
+                    elif listings:
+                        self._log(f"📋 {scraper_name}: {len(listings)} listings, none profitable ({progress_pct}% complete)")
+                    else:
+                        self._log(f"   {scraper_name}: No results ({progress_pct}% complete)")
 
-                        # Random delay between 2-5 seconds to be respectful
-                        time.sleep(random.uniform(2.0, 5.0))
+                    # Shorter delay - 1 to 2 seconds between requests
+                    time.sleep(random.uniform(1.0, 2.0))
 
-                    except Exception as e:
-                        print(f"   ✗ Error with {scraper.__class__.__name__}: {e}")
-                        if self.progress_callback:
-                            self.progress_callback(f"⚠️ {scraper.__class__.__name__}: Error - {str(e)[:50]}")
-        
+                except Exception as e:
+                    completed += 1
+                    progress_pct = int((completed / total_searches) * 100)
+                    self._log(f"⚠️ {scraper.__class__.__name__}: Error - {str(e)[:60]} ({progress_pct}% complete)")
+
         # Remove duplicates based on URL
         seen_urls = set()
         unique_deals = []
         for deal in self.profitable_deals:
-            if deal.url not in seen_urls:
+            if deal.url and deal.url not in seen_urls:
                 seen_urls.add(deal.url)
                 unique_deals.append(deal)
-        
+            elif not deal.url:
+                unique_deals.append(deal)
+
         self.profitable_deals = unique_deals
-    
+
+        self._log(f"🏁 Complete! {len(self.all_listings)} total listings, {len(self.profitable_deals)} profitable deals")
+
     def export_csv(self, filename: str):
         """Export results to CSV"""
         if not self.profitable_deals:
             print("\n⚠️  No profitable deals found to export")
             return
 
+        import os
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+
         with open(filename, 'w', newline='', encoding='utf-8') as f:
             fieldnames = list(self.profitable_deals[0].to_dict().keys())
             writer = csv.DictWriter(f, fieldnames=fieldnames)
-
             writer.writeheader()
             for deal in sorted(self.profitable_deals, key=lambda x: x.net_profit, reverse=True):
                 writer.writerow(deal.to_dict())
@@ -718,20 +901,18 @@ class CarArbitrageFinder:
         print(f"\n✓ CSV exported: {filename}")
 
     def export_html(self, filename: str):
-        """Export results to interactive HTML report"""
+        """Export results to HTML report"""
         if not self.profitable_deals:
-            print("\n⚠️  No profitable deals found to export HTML")
             return
 
-        # Sort deals by profit
-        sorted_deals = sorted(self.profitable_deals, key=lambda x: x.net_profit, reverse=True)
+        import os
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
 
-        # Calculate stats
+        sorted_deals = sorted(self.profitable_deals, key=lambda x: x.net_profit, reverse=True)
         total_profit = sum(d.net_profit for d in sorted_deals)
         avg_profit = total_profit / len(sorted_deals)
         best_margin = max(d.profit_margin for d in sorted_deals)
 
-        # Build car data JSON
         car_data_json = []
         for deal in sorted_deals:
             car_data_json.append({
@@ -749,494 +930,132 @@ class CarArbitrageFinder:
             })
 
         html_content = f'''<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Car Arbitrage Report - Liverpool to NI</title>
-    <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
-            color: #e0e0e0;
-            padding: 20px;
-            min-height: 100vh;
-        }}
-        .container {{ max-width: 1800px; margin: 0 auto; }}
-        header {{ text-align: center; margin-bottom: 40px; }}
-        h1 {{
-            color: #00ff88;
-            margin: 30px 0 10px;
-            font-size: 3em;
-            text-shadow: 0 0 30px rgba(0,255,136,0.6);
-            font-weight: 800;
-        }}
-        .subtitle {{ color: #888; font-size: 1.1em; margin-bottom: 10px; }}
-        .hero-text {{
-            color: #aaa;
-            font-size: 0.95em;
-            max-width: 800px;
-            margin: 0 auto 20px;
-            line-height: 1.6;
-        }}
-        .stats {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 25px;
-            margin: 40px 0;
-        }}
-        .stat-card {{
-            background: linear-gradient(135deg, #1a1f3a 0%, #2a2f4a 100%);
-            padding: 30px;
-            border-radius: 16px;
-            border: 1px solid #00ff8833;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.4);
-            transition: transform 0.3s, box-shadow 0.3s;
-        }}
-        .stat-card:hover {{
-            transform: translateY(-5px);
-            box-shadow: 0 12px 35px rgba(0,255,136,0.2);
-        }}
-        .stat-value {{
-            font-size: 3em;
-            color: #00ff88;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }}
-        .stat-label {{
-            color: #888;
-            font-size: 0.95em;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }}
-        .table-container {{
-            background: #1a1f3a;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
-            margin: 40px 0;
-        }}
-        table {{ width: 100%; border-collapse: collapse; }}
-        th {{
-            background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
-            color: #0a0e27;
-            padding: 20px 15px;
-            text-align: left;
-            font-weight: 700;
-            text-transform: uppercase;
-            font-size: 0.85em;
-            letter-spacing: 1px;
-        }}
-        td {{
-            padding: 18px 15px;
-            border-bottom: 1px solid #2a2f4a;
-            font-size: 0.95em;
-        }}
-        tbody tr {{ transition: background 0.2s; }}
-        tbody tr:hover {{ background: #252a45; cursor: pointer; }}
-        tbody tr:last-child td {{ border-bottom: none; }}
-        .profit {{ color: #00ff88; font-weight: bold; font-size: 1.15em; }}
-        .price {{ color: #ffaa00; font-weight: 600; }}
-        .location {{ color: #6666ff; }}
-        .model-badge {{
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 0.8em;
-            font-weight: 700;
-            background: #2a2f4a;
-            color: #00ff88;
-            border: 1px solid #00ff8866;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }}
-        .high-profit {{
-            background: linear-gradient(135deg, #00ff8822 0%, #00ff8833 100%);
-            color: #00ff88;
-            border: 1px solid #00ff88;
-            padding: 8px 14px;
-            border-radius: 8px;
-            font-weight: bold;
-        }}
-        .medium-profit {{
-            background: linear-gradient(135deg, #ffaa0022 0%, #ffaa0033 100%);
-            color: #ffaa00;
-            border: 1px solid #ffaa00;
-            padding: 8px 14px;
-            border-radius: 8px;
-            font-weight: bold;
-        }}
-        a {{
-            color: #6666ff;
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.2s;
-        }}
-        a:hover {{ color: #8888ff; text-decoration: underline; }}
-        .car-title {{ font-weight: 600; color: #fff; font-size: 1.05em; }}
-        .timestamp {{
-            text-align: center;
-            color: #666;
-            margin: 60px 0 40px;
-            font-size: 0.9em;
-        }}
-        .filter-bar {{
-            background: #1a1f3a;
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 30px;
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            align-items: center;
-        }}
-        .filter-bar label {{ color: #888; font-size: 0.9em; margin-right: 5px; }}
-        .filter-bar select, .filter-bar input {{
-            background: #2a2f4a;
-            color: #e0e0e0;
-            border: 1px solid #00ff8833;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 0.9em;
-        }}
-        .link-btn {{
-            background: linear-gradient(135deg, #6666ff 0%, #4444dd 100%);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 6px;
-            text-decoration: none;
-            display: inline-block;
-            font-weight: 600;
-            font-size: 0.9em;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }}
-        .link-btn:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(102,102,255,0.4);
-            text-decoration: none;
-        }}
-        .no-data {{
-            text-align: center;
-            padding: 80px 20px;
-            color: #888;
-            font-size: 1.3em;
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>🏎️ Car Arbitrage Opportunities</h1>
-            <p class="subtitle">Liverpool → Northern Ireland | Drift & Race Scene</p>
-            <p class="hero-text">
-                Real-time profitable drift and race cars to buy near Liverpool and sell in Northern Ireland's thriving enthusiast market.
-            </p>
-        </header>
+<html><head><meta charset="UTF-8"><title>Car Arbitrage Report</title>
+<style>body{{font-family:sans-serif;background:#0a0e27;color:#e0e0e0;padding:20px;}}
+h1{{color:#00ff88;text-align:center;}}
+table{{width:100%;border-collapse:collapse;margin-top:20px;}}
+th{{background:#00ff88;color:#0a0e27;padding:12px;text-align:left;}}
+td{{padding:10px;border-bottom:1px solid #2a2f4a;}}
+tr:hover{{background:#252a45;}}
+.profit{{color:#00ff88;font-weight:bold;}}
+a{{color:#6666ff;}}</style></head>
+<body><h1>Car Arbitrage Report - {datetime.now().strftime("%Y-%m-%d %H:%M")}</h1>
+<p style="text-align:center;color:#888;">{len(sorted_deals)} deals | £{total_profit:,} total profit | £{avg_profit:,.0f} avg</p>
+<table><thead><tr><th>Car</th><th>Price</th><th>NI Price</th><th>Profit</th><th>Margin</th><th>Location</th><th>Link</th></tr></thead><tbody>'''
 
-        <div class="stats">
-            <div class="stat-card">
-                <div class="stat-value" id="total-deals">{len(sorted_deals)}</div>
-                <div class="stat-label">Profitable Deals</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="total-profit">£{total_profit:,}</div>
-                <div class="stat-label">Total Potential Profit</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="avg-profit">£{avg_profit:,.0f}</div>
-                <div class="stat-label">Average Profit/Car</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="best-margin">{best_margin:.1f}%</div>
-                <div class="stat-label">Best Profit Margin</div>
-            </div>
-        </div>
+        for deal in car_data_json:
+            html_content += f'<tr><td>{deal["title"]}</td><td>{deal["price"]}</td><td>{deal["ni_price"]}</td><td class="profit">{deal["profit"]}</td><td>{deal["margin"]}</td><td>{deal["location"]}</td><td><a href="{deal["url"]}" target="_blank">View</a></td></tr>'
 
-        <div class="filter-bar">
-            <div>
-                <label>Filter by Model:</label>
-                <select id="model-filter">
-                    <option value="all">All Models</option>
-                </select>
-            </div>
-            <div>
-                <label>Min Profit:</label>
-                <select id="profit-filter">
-                    <option value="0">Any</option>
-                    <option value="1000">£1,000+</option>
-                    <option value="1500">£1,500+</option>
-                    <option value="2000">£2,000+</option>
-                    <option value="3000">£3,000+</option>
-                </select>
-            </div>
-            <div>
-                <label>Max Distance:</label>
-                <select id="distance-filter">
-                    <option value="100">100 miles</option>
-                    <option value="75">75 miles</option>
-                    <option value="50">50 miles</option>
-                    <option value="25">25 miles</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="table-container">
-            <table id="deals-table">
-                <thead>
-                    <tr>
-                        <th>Model</th>
-                        <th>Title</th>
-                        <th>Buy Price</th>
-                        <th>Sell Price (NI)</th>
-                        <th>Net Profit</th>
-                        <th>Margin</th>
-                        <th>Location</th>
-                        <th>Distance</th>
-                        <th>Details</th>
-                        <th>Link</th>
-                    </tr>
-                </thead>
-                <tbody id="deals-body">
-                </tbody>
-            </table>
-        </div>
-
-        <div class="timestamp">
-            <strong>Live Data Report</strong><br>
-            Generated: <span id="timestamp">{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</span><br>
-            <em>Based on real searches from AutoTrader, Gumtree, and PistonHeads</em>
-        </div>
-    </div>
-
-    <script>
-        const carData = {json.dumps(car_data_json, indent=8)};
-
-        let filteredData = [...carData];
-
-        function renderTable() {{
-            const tbody = document.getElementById('deals-body');
-            tbody.innerHTML = '';
-
-            if (filteredData.length === 0) {{
-                tbody.innerHTML = '<tr><td colspan="10" class="no-data">No deals match your filters. Try adjusting the criteria above.</td></tr>';
-                return;
-            }}
-
-            filteredData.forEach(car => {{
-                const profit = parseInt(car.profit.replace(/[£,]/g, ''));
-                const profitClass = profit >= 2000 ? 'high-profit' : 'medium-profit';
-
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td><span class="model-badge">${{car.model}}</span></td>
-                    <td class="car-title">${{car.title}}</td>
-                    <td class="price">${{car.price}}</td>
-                    <td class="price">${{car.ni_price}}</td>
-                    <td><span class="${{profitClass}}">${{car.profit}}</span></td>
-                    <td>${{car.margin}}</td>
-                    <td class="location">${{car.location}}</td>
-                    <td>${{car.distance}} mi</td>
-                    <td>${{car.year}} | ${{car.mileage}} mi</td>
-                    <td><a href="${{car.url}}" target="_blank" class="link-btn">View →</a></td>
-                `;
-                tbody.appendChild(row);
-            }});
-        }}
-
-        function populateFilters() {{
-            const models = [...new Set(carData.map(car => car.model))];
-            const modelFilter = document.getElementById('model-filter');
-
-            models.forEach(model => {{
-                const option = document.createElement('option');
-                option.value = model;
-                option.textContent = model;
-                modelFilter.appendChild(option);
-            }});
-        }}
-
-        function applyFilters() {{
-            const modelFilter = document.getElementById('model-filter').value;
-            const profitFilter = parseInt(document.getElementById('profit-filter').value);
-            const distanceFilter = parseFloat(document.getElementById('distance-filter').value);
-
-            filteredData = carData.filter(car => {{
-                const profit = parseInt(car.profit.replace(/[£,]/g, ''));
-                const distance = parseFloat(car.distance);
-
-                const modelMatch = modelFilter === 'all' || car.model === modelFilter;
-                const profitMatch = profit >= profitFilter;
-                const distanceMatch = distance <= distanceFilter;
-
-                return modelMatch && profitMatch && distanceMatch;
-            }});
-
-            renderTable();
-        }}
-
-        document.getElementById('model-filter').addEventListener('change', applyFilters);
-        document.getElementById('profit-filter').addEventListener('change', applyFilters);
-        document.getElementById('distance-filter').addEventListener('change', applyFilters);
-
-        populateFilters();
-        renderTable();
-    </script>
-</body>
-</html>'''
+        html_content += '</tbody></table></body></html>'
 
         with open(filename, 'w', encoding='utf-8') as f:
             f.write(html_content)
 
         print(f"\n✓ HTML report exported: {filename}")
-    
+
     def print_summary(self):
         """Print summary of findings"""
         print("\n" + "="*60)
         print("  SUMMARY")
         print("="*60)
-        
+
         if not self.profitable_deals:
             print("\n⚠️  No profitable deals found matching criteria")
-            print("\nTips:")
-            print("  • Increase MAX_DISTANCE_MILES")
-            print("  • Adjust max_price limits in TARGET_CARS")
-            print("  • Lower min_profit requirements")
             return
-        
+
         total_potential_profit = sum(d.net_profit for d in self.profitable_deals)
         avg_profit = total_potential_profit / len(self.profitable_deals)
         best_deal = max(self.profitable_deals, key=lambda x: x.net_profit)
-        best_margin = max(self.profitable_deals, key=lambda x: x.profit_margin)
-        
+
         print(f"\n📊 Deals found: {len(self.profitable_deals)}")
         print(f"💰 Total potential profit: £{total_potential_profit:,}")
         print(f"📈 Average profit per car: £{avg_profit:,.0f}")
-        print(f"🏆 Best deal profit: £{best_deal.net_profit:,} ({best_deal.title})")
-        print(f"📊 Best margin: {best_margin.profit_margin:.1f}% ({best_margin.title})")
-        
-        print("\n🎯 Top 5 Opportunities:\n")
-        for i, deal in enumerate(sorted(self.profitable_deals, key=lambda x: x.net_profit, reverse=True)[:5], 1):
-            print(f"{i}. {deal.title}")
-            print(f"   Buy: £{deal.price:,} → Sell: £{deal.expected_ni_price:,}")
-            print(f"   💵 Net profit: £{deal.net_profit:,} ({deal.profit_margin:.1f}% margin)")
-            print(f"   📍 {deal.location} ({deal.distance:.1f} miles from Liverpool)")
-            print(f"   🔗 {deal.url}\n")
+        print(f"🏆 Best deal: £{best_deal.net_profit:,} ({best_deal.title})")
 
 
 def create_sample_data():
-    """Create sample data for demonstration - focused on 4 high-demand models"""
+    """Create sample data for demonstration"""
     samples = [
         {
             'model_type': 'peugeot_306_dturbo',
             'title': 'Peugeot 306 D-Turbo - 3 Door - Full Service History',
-            'price': 3800,
-            'location': 'Manchester',
+            'price': 3800, 'location': 'Manchester',
             'coords': (53.4808, -2.2426),
             'url': 'https://www.gumtree.com/p/cars/peugeot-306-d-turbo/1234567890',
-            'year': '1999',
-            'mileage': '145,000',
-            'source': 'Gumtree'
+            'year': '1999', 'mileage': '145,000', 'source': 'Gumtree'
         },
         {
             'model_type': 'peugeot_306_dturbo',
             'title': 'Peugeot 306 DTurbo 3dr - Clean Example',
-            'price': 4200,
-            'location': 'Leeds',
+            'price': 4200, 'location': 'Leeds',
             'coords': (53.8008, -1.5491),
             'url': 'https://www.autotrader.co.uk/car-details/202602150001',
-            'year': '2000',
-            'mileage': '128,000',
-            'source': 'AutoTrader'
+            'year': '2000', 'mileage': '128,000', 'source': 'AutoTrader'
         },
         {
             'model_type': 'lexus_is200',
             'title': 'Lexus IS200 Sport Manual - Excellent Condition',
-            'price': 3200,
-            'location': 'Chester',
+            'price': 3200, 'location': 'Chester',
             'coords': (53.1908, -2.8908),
             'url': 'https://www.autotrader.co.uk/car-details/202602150002',
-            'year': '2003',
-            'mileage': '112,000',
-            'source': 'AutoTrader'
+            'year': '2003', 'mileage': '112,000', 'source': 'AutoTrader'
         },
         {
             'model_type': 'lexus_is200',
             'title': 'Lexus IS-200 SE Manual 6 Speed - FSH',
-            'price': 2900,
-            'location': 'Birmingham',
+            'price': 2900, 'location': 'Birmingham',
             'coords': (52.4862, -1.8904),
             'url': 'https://www.gumtree.com/p/cars/lexus-is200-manual/1234567891',
-            'year': '2002',
-            'mileage': '135,000',
-            'source': 'Gumtree'
+            'year': '2002', 'mileage': '135,000', 'source': 'Gumtree'
         },
         {
             'model_type': 'bmw_e46_330',
             'title': 'BMW E46 330i M Sport Manual - Full History',
-            'price': 4500,
-            'location': 'Preston',
+            'price': 4500, 'location': 'Preston',
             'coords': (53.7632, -2.7031),
             'url': 'https://www.autotrader.co.uk/car-details/202602150003',
-            'year': '2004',
-            'mileage': '95,000',
-            'source': 'AutoTrader'
+            'year': '2004', 'mileage': '95,000', 'source': 'AutoTrader'
         },
         {
             'model_type': 'bmw_e46_330',
             'title': 'BMW 330ci E46 Coupe Manual - Excellent',
-            'price': 3800,
-            'location': 'Sheffield',
+            'price': 3800, 'location': 'Sheffield',
             'coords': (53.3811, -1.4701),
             'url': 'https://www.pistonheads.com/classifieds/used-cars/bmw/e46/12345678',
-            'year': '2003',
-            'mileage': '118,000',
-            'source': 'PistonHeads'
+            'year': '2003', 'mileage': '118,000', 'source': 'PistonHeads'
         },
         {
             'model_type': 'honda_civic_ep3_type_r',
             'title': 'Honda Civic Type R EP3 - Championship White - FSH',
-            'price': 7200,
-            'location': 'Bolton',
+            'price': 7200, 'location': 'Bolton',
             'coords': (53.5768, -2.4282),
             'url': 'https://www.autotrader.co.uk/car-details/202602150004',
-            'year': '2005',
-            'mileage': '82,000',
-            'source': 'AutoTrader'
+            'year': '2005', 'mileage': '82,000', 'source': 'AutoTrader'
         },
         {
             'model_type': 'honda_civic_ep3_type_r',
             'title': 'Honda Civic EP3 Type-R - Recaro Seats - HPI Clear',
-            'price': 6500,
-            'location': 'Warrington',
+            'price': 6500, 'location': 'Warrington',
             'coords': (53.3900, -2.5970),
             'url': 'https://www.pistonheads.com/classifieds/used-cars/honda/civic/12345679',
-            'year': '2004',
-            'mileage': '98,000',
-            'source': 'PistonHeads'
+            'year': '2004', 'mileage': '98,000', 'source': 'PistonHeads'
         },
         {
-            'model_type': 'peugeot_306_dturbo',
-            'title': 'Peugeot 306 D Turbo - Lowered - Good Runner',
-            'price': 3500,
-            'location': 'Liverpool',
+            'model_type': 'bmw_e60_530d',
+            'title': 'BMW 530d E60 M Sport Auto - Full BMW History',
+            'price': 3500, 'location': 'Liverpool',
             'coords': (53.4084, -2.9916),
-            'url': 'https://www.gumtree.com/p/cars/peugeot-306-d-turbo-modified/1234567892',
-            'year': '1998',
-            'mileage': '167,000',
-            'source': 'Gumtree'
+            'url': 'https://www.autotrader.co.uk/car-details/202602150006',
+            'year': '2007', 'mileage': '142,000', 'source': 'AutoTrader'
         },
         {
-            'model_type': 'lexus_is200',
-            'title': 'Lexus IS200 2.0 SE Manual - 12 Months MOT',
-            'price': 3600,
-            'location': 'Blackpool',
-            'coords': (53.8175, -3.0357),
-            'url': 'https://www.autotrader.co.uk/car-details/202602150005',
-            'year': '2004',
-            'mileage': '124,000',
-            'source': 'AutoTrader'
-        }
+            'model_type': 'bmw_f30_330d',
+            'title': 'BMW 330d F30 M Sport - Pro Nav - Leather',
+            'price': 9800, 'location': 'Manchester',
+            'coords': (53.4808, -2.2426),
+            'url': 'https://www.autotrader.co.uk/car-details/202602150007',
+            'year': '2015', 'mileage': '87,000', 'source': 'AutoTrader'
+        },
     ]
 
     return [CarListing(s) for s in samples]
@@ -1245,15 +1064,13 @@ def create_sample_data():
 def main():
     parser = argparse.ArgumentParser(description='Car Arbitrage Finder - Liverpool to NI')
     parser.add_argument('--demo', action='store_true', help='Run with sample data')
-    parser.add_argument('--output', default=None, help='Output base filename (without extension)')
+    parser.add_argument('--output', default=None, help='Output base filename')
 
     args = parser.parse_args()
 
-    # Create output directory
     import os
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # Generate timestamp for filenames
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     base_filename = args.output if args.output else f'{OUTPUT_DIR}/deals_{timestamp}'
 
@@ -1263,17 +1080,6 @@ def main():
         print("\n🎬 Running in DEMO mode with sample data\n")
         finder.profitable_deals = [d for d in create_sample_data() if d.is_profitable()]
     else:
-        # Display legal notice
-        print("\n" + "="*60)
-        print("  LEGAL & ETHICAL WEB SCRAPING NOTICE")
-        print("="*60)
-        print("\n⚖️  This scraper respects robots.txt and uses rate limiting")
-        print("⏱️  Random delays (2-5s) between requests to avoid server load")
-        print("🤝 Please use responsibly and respect website Terms of Service")
-        print("\n✅ Best practice: Use official APIs where available")
-        print("✅ Alternative: Manual searches with saved alerts\n")
-
-        # Run actual scraping
         finder.search_all()
 
     finder.print_summary()
@@ -1281,24 +1087,9 @@ def main():
     if finder.profitable_deals:
         csv_file = f"{base_filename}.csv"
         html_file = f"{base_filename}.html"
-
         finder.export_csv(csv_file)
         finder.export_html(html_file)
-
-        print("\n" + "="*60)
-        print("📊 EXPORTED FILES:")
-        print("="*60)
-        print(f"  CSV:  {csv_file}")
-        print(f"  HTML: {html_file}")
-        print("\n" + "="*60)
-        print("Next steps:")
-        print("="*60)
-        print("  1. Open the HTML file in your browser for interactive view")
-        print("  2. Review deals and verify listings are still available")
-        print("  3. Contact sellers for best opportunities")
-        print(f"  4. Remember to factor in costs: £{COSTS_PER_CAR} per car")
-        print("  5. Research NI market prices before committing")
-        print("="*60 + "\n")
+        print(f"\n📊 Exported: {csv_file}, {html_file}")
 
 
 if __name__ == "__main__":
