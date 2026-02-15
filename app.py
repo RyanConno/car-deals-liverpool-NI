@@ -298,6 +298,13 @@ h1{color:#00ff88;font-size:2.5em;margin-bottom:10px;text-shadow:0 0 30px rgba(0,
 .deal-link{display:inline-block;margin-top:10px;padding:8px 16px;background:linear-gradient(135deg,#6666ff,#4444dd);color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:.9em}
 .deal-link:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(102,102,255,.4)}
 
+.filters{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin:20px 0}
+.filters select{background:#1a1f3a;color:#e0e0e0;border:1px solid #00ff88;padding:10px 16px;border-radius:6px;font-size:14px;cursor:pointer;min-width:200px;appearance:auto}
+.filters select:hover{border-color:#00ffaa}
+.filter-label{color:#888;font-size:.8em;text-transform:uppercase;letter-spacing:1px;text-align:center;margin-bottom:4px}
+.filter-count{text-align:center;color:#888;font-size:.9em;margin-top:8px}
+.filter-count span{color:#00ff88;font-weight:bold}
+
 .loading{text-align:center;padding:30px;color:#888;font-size:1.1em}
 .spinner{border:3px solid #2a2f4a;border-top:3px solid #00ff88;border-radius:50%;width:36px;height:36px;animation:spin 1s linear infinite;margin:15px auto}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -337,6 +344,17 @@ h1{color:#00ff88;font-size:2.5em;margin-bottom:10px;text-shadow:0 0 30px rgba(0,
 
     <div class="deals-box">
         <h2 style="color:#00ff88;margin-bottom:15px">Profitable Deals</h2>
+        <div class="filters">
+            <div>
+                <div class="filter-label">Filter by Model</div>
+                <select id="modelFilter" onchange="filterDeals()"><option value="all">All Models</option></select>
+            </div>
+            <div>
+                <div class="filter-label">Filter by Source</div>
+                <select id="sourceFilter" onchange="filterDeals()"><option value="all">All Sources</option></select>
+            </div>
+        </div>
+        <div class="filter-count" id="filterCount"></div>
         <div id="deals"></div>
     </div>
 </div>
@@ -344,6 +362,18 @@ h1{color:#00ff88;font-size:2.5em;margin-bottom:10px;text-shadow:0 0 30px rgba(0,
 <script>
 var polling = null;
 var statusPoll = null;
+var allDeals = [];
+
+var modelLabels = {
+    'peugeot_306_dturbo': 'Peugeot 306 D-Turbo',
+    'lexus_is200': 'Lexus IS200',
+    'bmw_e46_330': 'BMW E46 330i/ci',
+    'honda_civic_ep3_type_r': 'Honda Civic EP3 Type R',
+    'bmw_e60_530d': 'BMW E60 530d',
+    'bmw_e60_535d': 'BMW E60 535d',
+    'bmw_f30_330d': 'BMW F30 330d',
+    'bmw_f30_335d': 'BMW F30 335d'
+};
 
 function doScrape(demo) {
     try {
@@ -481,53 +511,105 @@ function loadDeals() {
     xhr.open('GET', '/api/deals');
     xhr.onload = function() {
         if (xhr.status !== 200) return;
-        var deals = JSON.parse(xhr.responseText);
-        var container = document.getElementById('deals');
+        allDeals = JSON.parse(xhr.responseText);
 
-        if (deals.length === 0) {
-            container.innerHTML = '<div class="loading">No deals found yet. Click "Scrape Live Data" or "Demo Mode" to find deals.</div>';
+        if (allDeals.length === 0) {
+            document.getElementById('deals').innerHTML = '<div class="loading">No deals found yet. Click "Scrape Live Data" or "Demo Mode" to find deals.</div>';
             document.getElementById('stats').style.display = 'none';
+            document.getElementById('filterCount').textContent = '';
             return;
         }
 
-        // Update stats
-        var totalProfit = 0;
-        var bestMargin = 0;
-        for (var i = 0; i < deals.length; i++) {
-            totalProfit += deals[i].net_profit;
-            if (deals[i].profit_margin > bestMargin) bestMargin = deals[i].profit_margin;
+        // Populate filter dropdowns
+        var models = {};
+        var sources = {};
+        for (var i = 0; i < allDeals.length; i++) {
+            models[allDeals[i].model_type] = true;
+            sources[allDeals[i].source] = true;
         }
-        var avgProfit = Math.round(totalProfit / deals.length);
 
-        document.getElementById('s-deals').textContent = deals.length;
-        document.getElementById('s-profit').innerHTML = '&pound;' + totalProfit.toLocaleString();
-        document.getElementById('s-avg').innerHTML = '&pound;' + avgProfit.toLocaleString();
-        document.getElementById('s-margin').textContent = bestMargin.toFixed(1) + '%';
-        document.getElementById('stats').style.display = 'grid';
+        var modelSel = document.getElementById('modelFilter');
+        var curModel = modelSel.value;
+        modelSel.innerHTML = '<option value="all">All Models</option>';
+        Object.keys(models).sort().forEach(function(m) {
+            var opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = modelLabels[m] || m;
+            modelSel.appendChild(opt);
+        });
+        modelSel.value = curModel;
 
-        // Render deal cards
-        var html = '';
-        for (var i = 0; i < deals.length; i++) {
-            var d = deals[i];
-            html += '<div class="deal-card">';
-            html += '<div class="deal-title">' + escHtml(d.title) + '</div>';
-            html += '<div class="deal-grid">';
-            html += '<div><div class="deal-lbl">Buy Price</div><div class="deal-val">&pound;' + d.price.toLocaleString() + '</div></div>';
-            html += '<div><div class="deal-lbl">Sell Price (NI)</div><div class="deal-val">&pound;' + d.expected_ni_price.toLocaleString() + '</div></div>';
-            html += '<div><div class="deal-lbl">Net Profit</div><div class="deal-val deal-profit">&pound;' + d.net_profit.toLocaleString() + '</div></div>';
-            html += '<div><div class="deal-lbl">Margin</div><div class="deal-val">' + d.profit_margin.toFixed(1) + '%</div></div>';
-            html += '<div><div class="deal-lbl">Location</div><div class="deal-val">' + escHtml(d.location) + ' (' + d.distance + ' mi)</div></div>';
-            html += '<div><div class="deal-lbl">Source</div><div class="deal-val">' + escHtml(d.source) + '</div></div>';
-            html += '</div>';
-            if (d.url) {
-                html += '<a href="' + escAttr(d.url) + '" target="_blank" class="deal-link">View Listing &rarr;</a>';
-            }
-            html += '</div>';
-        }
-        container.innerHTML = html;
+        var sourceSel = document.getElementById('sourceFilter');
+        var curSource = sourceSel.value;
+        sourceSel.innerHTML = '<option value="all">All Sources</option>';
+        Object.keys(sources).sort().forEach(function(s) {
+            var opt = document.createElement('option');
+            opt.value = s;
+            opt.textContent = s;
+            sourceSel.appendChild(opt);
+        });
+        sourceSel.value = curSource;
+
+        filterDeals();
     };
     xhr.onerror = function() {};
     xhr.send();
+}
+
+function filterDeals() {
+    var modelVal = document.getElementById('modelFilter').value;
+    var sourceVal = document.getElementById('sourceFilter').value;
+
+    var filtered = allDeals.filter(function(d) {
+        var matchModel = (modelVal === 'all' || d.model_type === modelVal);
+        var matchSource = (sourceVal === 'all' || d.source === sourceVal);
+        return matchModel && matchSource;
+    });
+
+    // Update stats with filtered data
+    var totalProfit = 0;
+    var bestMargin = 0;
+    for (var i = 0; i < filtered.length; i++) {
+        totalProfit += filtered[i].net_profit;
+        if (filtered[i].profit_margin > bestMargin) bestMargin = filtered[i].profit_margin;
+    }
+    var avgProfit = filtered.length > 0 ? Math.round(totalProfit / filtered.length) : 0;
+
+    document.getElementById('s-deals').textContent = filtered.length;
+    document.getElementById('s-profit').innerHTML = '&pound;' + totalProfit.toLocaleString();
+    document.getElementById('s-avg').innerHTML = '&pound;' + avgProfit.toLocaleString();
+    document.getElementById('s-margin').textContent = bestMargin.toFixed(1) + '%';
+    document.getElementById('stats').style.display = 'grid';
+
+    // Show filter count
+    document.getElementById('filterCount').innerHTML = 'Showing <span>' + filtered.length + '</span> of <span>' + allDeals.length + '</span> deals';
+
+    // Render deal cards
+    var container = document.getElementById('deals');
+    if (filtered.length === 0) {
+        container.innerHTML = '<div class="loading">No deals match the selected filters.</div>';
+        return;
+    }
+
+    var html = '';
+    for (var i = 0; i < filtered.length; i++) {
+        var d = filtered[i];
+        html += '<div class="deal-card">';
+        html += '<div class="deal-title">' + escHtml(d.title) + '</div>';
+        html += '<div class="deal-grid">';
+        html += '<div><div class="deal-lbl">Buy Price</div><div class="deal-val">&pound;' + d.price.toLocaleString() + '</div></div>';
+        html += '<div><div class="deal-lbl">Sell Price (NI)</div><div class="deal-val">&pound;' + d.expected_ni_price.toLocaleString() + '</div></div>';
+        html += '<div><div class="deal-lbl">Net Profit</div><div class="deal-val deal-profit">&pound;' + d.net_profit.toLocaleString() + '</div></div>';
+        html += '<div><div class="deal-lbl">Margin</div><div class="deal-val">' + d.profit_margin.toFixed(1) + '%</div></div>';
+        html += '<div><div class="deal-lbl">Location</div><div class="deal-val">' + escHtml(d.location) + ' (' + d.distance + ' mi)</div></div>';
+        html += '<div><div class="deal-lbl">Source</div><div class="deal-val">' + escHtml(d.source) + '</div></div>';
+        html += '</div>';
+        if (d.url) {
+            html += '<a href="' + escAttr(d.url) + '" target="_blank" class="deal-link">View Listing &rarr;</a>';
+        }
+        html += '</div>';
+    }
+    container.innerHTML = html;
 }
 
 function showMsg(text, color) {
