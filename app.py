@@ -520,27 +520,43 @@ def index():
         let dealsPollingInterval;
 
         async function runScraper(demo) {
+            console.log('runScraper called, demo:', demo);
+
             const btn = document.getElementById('scrape-btn');
             btn.disabled = true;
 
-            // Clear existing deals immediately
-            const dealsList = document.getElementById('deals-list');
-            dealsList.innerHTML = '<div class="loading"><div class="spinner"></div>Searching for deals...</div>';
-            document.getElementById('stats').style.display = 'none';
-
-            // Show progress container
+            // Show progress container FIRST
             const progressContainer = document.getElementById('progress-container');
-            progressContainer.classList.add('active');
-            document.getElementById('progress-fill').style.width = '0%';
-            document.getElementById('progress-fill').textContent = '0%';
-            document.getElementById('current-action').textContent = 'Initializing scraper...';
-            document.getElementById('action-log').innerHTML = '';
+            if (progressContainer) {
+                console.log('Showing progress container');
+                progressContainer.classList.add('active');
+                progressContainer.style.display = 'block';  // Force display
+                document.getElementById('progress-fill').style.width = '0%';
+                document.getElementById('progress-fill').textContent = '0%';
+                document.getElementById('current-action').textContent = 'Initializing scraper...';
+                document.getElementById('action-log').innerHTML = '';
+            } else {
+                console.error('progress-container element not found!');
+            }
+
+            // Clear existing deals
+            const dealsList = document.getElementById('deals-list');
+            if (dealsList) {
+                dealsList.innerHTML = '<div class="loading"><div class="spinner"></div>Searching for deals...</div>';
+            }
+
+            const statsEl = document.getElementById('stats');
+            if (statsEl) {
+                statsEl.style.display = 'none';
+            }
 
             const url = demo ? '/api/scrape?demo=true' : '/api/scrape';
 
             try {
+                console.log('Starting scraper with URL:', url);
                 const response = await fetch(url, { method: 'POST' });
                 const data = await response.json();
+                console.log('Scraper response:', data);
 
                 if (data.status === 'started') {
                     showStatus('Scraper running... This may take 5-15 minutes', 'running');
@@ -550,9 +566,29 @@ def index():
                     dealsPollingInterval = setInterval(loadDeals, 2000);
                 }
             } catch (error) {
+                console.error('Scraper error:', error);
                 showStatus('Error starting scraper: ' + error.message, 'error');
                 btn.disabled = false;
-                progressContainer.classList.remove('active');
+
+                // Show error in progress container
+                if (progressContainer) {
+                    const progressFill = document.getElementById('progress-fill');
+                    progressFill.style.background = 'linear-gradient(90deg, #ff4444 0%, #cc0000 100%)';
+                    progressFill.style.width = '100%';
+                    progressFill.textContent = 'ERROR';
+
+                    document.getElementById('current-action').innerHTML = `<span style="color: #ff4444;">❌ Error: ${error.message}</span>`;
+
+                    const actionLog = document.getElementById('action-log');
+                    actionLog.innerHTML = `<div class="action-log-item" style="color: #ff4444; border-left-color: #ff4444;">
+                        <span class="time">${new Date().toTimeString().substr(0,8)}</span>❌ Scraper failed to start: ${error.message}
+                    </div>`;
+
+                    // Hide progress container after delay
+                    setTimeout(() => {
+                        progressContainer.classList.remove('active');
+                    }, 10000);
+                }
             }
         }
 
@@ -595,6 +631,32 @@ def index():
 
                     if (data.error) {
                         showStatus('Scraper error: ' + data.error, 'error');
+
+                        // Show error in progress container
+                        const progressFill = document.getElementById('progress-fill');
+                        if (progressFill) {
+                            progressFill.style.background = 'linear-gradient(90deg, #ff4444 0%, #cc0000 100%)';
+                            progressFill.style.width = '100%';
+                            progressFill.textContent = 'ERROR';
+                        }
+
+                        const currentAction = document.getElementById('current-action');
+                        if (currentAction) {
+                            currentAction.innerHTML = `<span style="color: #ff4444;">❌ Scraper Error: ${data.error}</span>`;
+                        }
+
+                        const actionLog = document.getElementById('action-log');
+                        if (actionLog) {
+                            const errorEntry = `<div class="action-log-item" style="color: #ff4444; border-left-color: #ff4444;">
+                                <span class="time">${new Date().toTimeString().substr(0,8)}</span>❌ ERROR: ${data.error}
+                            </div>`;
+                            actionLog.innerHTML = errorEntry + actionLog.innerHTML;
+                        }
+
+                        // Hide progress container after longer delay for errors
+                        setTimeout(() => {
+                            document.getElementById('progress-container').classList.remove('active');
+                        }, 15000);
                     } else {
                         showStatus('✓ Scraper completed successfully!', 'success');
                         loadDeals();  // Final update

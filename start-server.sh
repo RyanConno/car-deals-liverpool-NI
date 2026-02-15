@@ -63,9 +63,17 @@ sudo systemctl daemon-reload
 echo "⚙️  Enabling auto-start on boot..."
 sudo systemctl enable car-arbitrage 2>/dev/null || true
 
+# Clear Python cache to ensure fresh code
+echo "🧹 Clearing Python cache..."
+find "$SCRIPT_DIR" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find "$SCRIPT_DIR" -type f -name "*.pyc" -delete 2>/dev/null || true
+
 # Stop if already running
 echo "🛑 Stopping any existing service..."
 sudo systemctl stop car-arbitrage 2>/dev/null || true
+
+# Wait a moment to ensure clean shutdown
+sleep 1
 
 # Start the service
 echo "🚀 Starting Car Arbitrage service..."
