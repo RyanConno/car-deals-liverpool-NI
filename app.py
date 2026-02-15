@@ -446,7 +446,17 @@ var modelLabels = {
     'bmw_e60_530d': 'BMW E60 530d',
     'bmw_e60_535d': 'BMW E60 535d',
     'bmw_f30_330d': 'BMW F30 330d',
-    'bmw_f30_335d': 'BMW F30 335d'
+    'bmw_f30_335d': 'BMW F30 335d',
+    'mitsubishi_evo': 'Mitsubishi Evo 6/7/8/9',
+    'subaru_impreza_wrx': 'Subaru Impreza WRX/STI',
+    'toyota_starlet_glanza': 'Toyota Starlet Glanza',
+    'honda_integra_dc2': 'Honda Integra DC2 Type R',
+    'nissan_200sx_s14_s15': 'Nissan 200SX / Silvia',
+    'nissan_350z': 'Nissan 350Z',
+    'mazda_mx5_na_nb': 'Mazda MX-5 (NA/NB)',
+    'toyota_mr2_sw20': 'Toyota MR2 SW20 Turbo',
+    'ford_sierra_cosworth': 'Ford Sierra Cosworth',
+    'ford_escort_rs_turbo': 'Ford Escort RS Turbo'
 };
 
 var fallbackImages = {
@@ -459,7 +469,17 @@ var fallbackImages = {
     'bmw_e60_530d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/BMW_E60_front_20080417.jpg/640px-BMW_E60_front_20080417.jpg',
     'bmw_e60_535d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/BMW_E60_front_20080417.jpg/640px-BMW_E60_front_20080417.jpg',
     'bmw_f30_330d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/BMW_F30_320d_Sportline_Mineralgrau.jpg/640px-BMW_F30_320d_Sportline_Mineralgrau.jpg',
-    'bmw_f30_335d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/BMW_F30_320d_Sportline_Mineralgrau.jpg/640px-BMW_F30_320d_Sportline_Mineralgrau.jpg'
+    'bmw_f30_335d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/BMW_F30_320d_Sportline_Mineralgrau.jpg/640px-BMW_F30_320d_Sportline_Mineralgrau.jpg',
+    'mitsubishi_evo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Mitsubishi_Lancer_Evolution_VII.jpg/640px-Mitsubishi_Lancer_Evolution_VII.jpg',
+    'subaru_impreza_wrx': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Subaru_Impreza_WRX_STI_%28GDB%29.jpg/640px-Subaru_Impreza_WRX_STI_%28GDB%29.jpg',
+    'toyota_starlet_glanza': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Toyota_Starlet_1.3_GL_%28EP91%29.jpg/640px-Toyota_Starlet_1.3_GL_%28EP91%29.jpg',
+    'honda_integra_dc2': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/1999-2001_Honda_Integra_Type_R.jpg/640px-1999-2001_Honda_Integra_Type_R.jpg',
+    'nissan_200sx_s14_s15': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Nissan_200SX_%28S14%29.jpg/640px-Nissan_200SX_%28S14%29.jpg',
+    'nissan_350z': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Nissan_350Z_--_09-07-2009.jpg/640px-Nissan_350Z_--_09-07-2009.jpg',
+    'mazda_mx5_na_nb': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Mazda_MX-5_%28NA%29.jpg/640px-Mazda_MX-5_%28NA%29.jpg',
+    'toyota_mr2_sw20': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Toyota_MR2_%28SW20%29.jpg/640px-Toyota_MR2_%28SW20%29.jpg',
+    'ford_sierra_cosworth': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Ford_Sierra_RS_Cosworth.jpg/640px-Ford_Sierra_RS_Cosworth.jpg',
+    'ford_escort_rs_turbo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Ford_Escort_RS_Turbo_%2814433268513%29.jpg/640px-Ford_Escort_RS_Turbo_%2814433268513%29.jpg'
 };
 
 function doScrape(demo) {

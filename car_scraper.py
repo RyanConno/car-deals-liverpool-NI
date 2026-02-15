@@ -141,6 +141,116 @@ TARGET_CARS = {
         'year_min': 2012, 'year_max': 2019,
         'require_keywords': ['335d', '335 d'],
         'exclude_keywords': ['e90', 'g20', 'touring', 'estate']
+    },
+    'mitsubishi_evo': {
+        'search_terms': ['Mitsubishi Evo', 'Mitsubishi Lancer Evolution', 'Evo 6', 'Evo 7', 'Evo 8', 'Evo 9'],
+        'make': 'Mitsubishi', 'model': 'Lancer',
+        'max_price': 20000,
+        'ni_markup': 4500,
+        'min_profit': 1000,
+        'avg_uk_price': 14000,
+        'avg_ni_price': 18500,
+        'require_keywords': ['evo', 'evolution'],
+        'exclude_keywords': ['evo x', 'evo 10', 'fq-440', 'non runner', 'spares']
+    },
+    'subaru_impreza_wrx': {
+        'search_terms': ['Subaru Impreza WRX', 'Subaru WRX STI', 'Impreza WRX', 'Impreza STI'],
+        'make': 'Subaru', 'model': 'Impreza',
+        'max_price': 15000,
+        'ni_markup': 3500,
+        'min_profit': 1000,
+        'avg_uk_price': 9000,
+        'avg_ni_price': 12500,
+        'require_keywords': ['wrx', 'sti', 'turbo'],
+        'exclude_keywords': ['non runner', 'spares', 'breaking']
+    },
+    'toyota_starlet_glanza': {
+        'search_terms': ['Toyota Starlet Glanza', 'Starlet GT Turbo', 'Toyota Glanza V', 'EP91 Glanza'],
+        'make': 'Toyota', 'model': 'Starlet',
+        'max_price': 8000,
+        'ni_markup': 3500,
+        'min_profit': 1000,
+        'avg_uk_price': 5000,
+        'avg_ni_price': 8500,
+        'require_keywords': ['glanza', 'gt turbo', 'gt-turbo'],
+        'exclude_keywords': ['non runner', 'spares', 'breaking', 'shell']
+    },
+    'honda_integra_dc2': {
+        'search_terms': ['Honda Integra Type R', 'Integra DC2', 'DC2 Type R', 'Honda Integra'],
+        'make': 'Honda', 'model': 'Integra',
+        'max_price': 20000,
+        'ni_markup': 4000,
+        'min_profit': 1000,
+        'avg_uk_price': 14000,
+        'avg_ni_price': 18000,
+        'require_keywords': ['type r', 'type-r', 'dc2'],
+        'exclude_keywords': ['dc5', 'non runner', 'spares', 'breaking']
+    },
+    'nissan_200sx_s14_s15': {
+        'search_terms': ['Nissan 200SX', 'Nissan Silvia S14', 'Nissan Silvia S15', 'Nissan 200SX S14'],
+        'make': 'Nissan', 'model': '200SX',
+        'max_price': 15000,
+        'ni_markup': 4000,
+        'min_profit': 1000,
+        'avg_uk_price': 9000,
+        'avg_ni_price': 13000,
+        'require_keywords': ['200sx', 'silvia', 's14', 's15'],
+        'exclude_keywords': ['non runner', 'spares', 'breaking', 'shell']
+    },
+    'nissan_350z': {
+        'search_terms': ['Nissan 350Z', '350Z GT', '350Z sport', 'Nissan 350 Z'],
+        'make': 'Nissan', 'model': '350Z',
+        'max_price': 12000,
+        'ni_markup': 3000,
+        'min_profit': 1000,
+        'avg_uk_price': 7000,
+        'avg_ni_price': 10000,
+        'exclude_keywords': ['370z', 'non runner', 'spares', 'breaking', 'cat d', 'cat s', 'cat n']
+    },
+    'mazda_mx5_na_nb': {
+        'search_terms': ['Mazda MX-5', 'Mazda MX5', 'MX-5 1.8', 'Mazda Eunos'],
+        'make': 'Mazda', 'model': 'MX-5',
+        'max_price': 8000,
+        'ni_markup': 2500,
+        'min_profit': 1000,
+        'avg_uk_price': 4000,
+        'avg_ni_price': 6500,
+        'year_min': 1989, 'year_max': 2005,
+        'exclude_keywords': ['nc', 'nd', 'rf', '2006', '2007', '2008', '2009', '2010', '2011', '2012', 'non runner', 'spares']
+    },
+    'toyota_mr2_sw20': {
+        'search_terms': ['Toyota MR2 Turbo', 'MR2 SW20', 'Toyota MR2 GT', 'MR2 Rev3'],
+        'make': 'Toyota', 'model': 'MR2',
+        'max_price': 10000,
+        'ni_markup': 3000,
+        'min_profit': 1000,
+        'avg_uk_price': 6000,
+        'avg_ni_price': 9000,
+        'year_min': 1989, 'year_max': 1999,
+        'require_keywords': ['turbo', 'gt', 'sw20', 'rev', 'mr2'],
+        'exclude_keywords': ['mk1', 'aw11', 'mk3', 'zzw30', 'roadster', 'non runner', 'spares']
+    },
+    'ford_sierra_cosworth': {
+        'search_terms': ['Ford Sierra Cosworth', 'Sierra Sapphire Cosworth', 'Sierra RS Cosworth', 'Sierra Cossie'],
+        'make': 'Ford', 'model': 'Sierra',
+        'max_price': 45000,
+        'ni_markup': 6000,
+        'min_profit': 1000,
+        'avg_uk_price': 32000,
+        'avg_ni_price': 38000,
+        'require_keywords': ['cosworth', 'cossie', 'rs cosworth'],
+        'exclude_keywords': ['replica', 'kit', 'non runner', 'spares', 'project']
+    },
+    'ford_escort_rs_turbo': {
+        'search_terms': ['Ford Escort RS Turbo', 'Escort RS Turbo', 'Ford Escort RST'],
+        'make': 'Ford', 'model': 'Escort',
+        'max_price': 25000,
+        'ni_markup': 4000,
+        'min_profit': 1000,
+        'avg_uk_price': 16000,
+        'avg_ni_price': 20000,
+        'require_keywords': ['rs turbo', 'rst', 'rs-turbo'],
+        'exclude_keywords': ['replica', 'kit', 'non runner', 'spares', 'project']
     }
 }
 
@@ -156,6 +266,16 @@ MODEL_IMAGES = {
     'bmw_e60_535d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/BMW_E60_front_20080417.jpg/640px-BMW_E60_front_20080417.jpg',
     'bmw_f30_330d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/BMW_F30_320d_Sportline_Mineralgrau.jpg/640px-BMW_F30_320d_Sportline_Mineralgrau.jpg',
     'bmw_f30_335d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/BMW_F30_320d_Sportline_Mineralgrau.jpg/640px-BMW_F30_320d_Sportline_Mineralgrau.jpg',
+    'mitsubishi_evo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Mitsubishi_Lancer_Evolution_VII.jpg/640px-Mitsubishi_Lancer_Evolution_VII.jpg',
+    'subaru_impreza_wrx': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Subaru_Impreza_WRX_STI_%28GDB%29.jpg/640px-Subaru_Impreza_WRX_STI_%28GDB%29.jpg',
+    'toyota_starlet_glanza': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Toyota_Starlet_1.3_GL_%28EP91%29.jpg/640px-Toyota_Starlet_1.3_GL_%28EP91%29.jpg',
+    'honda_integra_dc2': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/1999-2001_Honda_Integra_Type_R.jpg/640px-1999-2001_Honda_Integra_Type_R.jpg',
+    'nissan_200sx_s14_s15': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Nissan_200SX_%28S14%29.jpg/640px-Nissan_200SX_%28S14%29.jpg',
+    'nissan_350z': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Nissan_350Z_--_09-07-2009.jpg/640px-Nissan_350Z_--_09-07-2009.jpg',
+    'mazda_mx5_na_nb': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Mazda_MX-5_%28NA%29.jpg/640px-Mazda_MX-5_%28NA%29.jpg',
+    'toyota_mr2_sw20': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Toyota_MR2_%28SW20%29.jpg/640px-Toyota_MR2_%28SW20%29.jpg',
+    'ford_sierra_cosworth': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Ford_Sierra_RS_Cosworth.jpg/640px-Ford_Sierra_RS_Cosworth.jpg',
+    'ford_escort_rs_turbo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Ford_Escort_RS_Turbo_%2814433268513%29.jpg/640px-Ford_Escort_RS_Turbo_%2814433268513%29.jpg',
 }
 
 # Headers to mimic a real browser (Linux-compatible)
@@ -447,6 +567,16 @@ class AutoTraderScraper:
             'bmw_f30_330d': '330d',
             'bmw_f30_335d': '335d',
             'honda_civic_ep3_type_r': 'type r',
+            'mitsubishi_evo': 'evolution',
+            'subaru_impreza_wrx': 'WRX',
+            'toyota_starlet_glanza': 'glanza',
+            'honda_integra_dc2': 'type r',
+            'nissan_200sx_s14_s15': '200sx',
+            'nissan_350z': '350z',
+            'mazda_mx5_na_nb': 'MX-5',
+            'toyota_mr2_sw20': 'MR2 turbo',
+            'ford_sierra_cosworth': 'cosworth',
+            'ford_escort_rs_turbo': 'rs turbo',
         }
         return keywords.get(model_type, '')
 
@@ -880,6 +1010,12 @@ class PistonHeadsScraper:
         'Lexus': 'lexus',
         'BMW': 'bmw',
         'Honda': 'honda',
+        'Mitsubishi': 'mitsubishi',
+        'Subaru': 'subaru',
+        'Toyota': 'toyota',
+        'Nissan': 'nissan',
+        'Mazda': 'mazda',
+        'Ford': 'ford',
     }
 
     def search(self, model_type: str, search_term: str) -> List[CarListing]:
@@ -957,6 +1093,16 @@ class PistonHeadsScraper:
             'bmw_e60_535d': ['535d', '535'],
             'bmw_f30_330d': ['330d'],
             'bmw_f30_335d': ['335d'],
+            'mitsubishi_evo': ['evo', 'evolution'],
+            'subaru_impreza_wrx': ['wrx', 'sti', 'impreza'],
+            'toyota_starlet_glanza': ['glanza', 'starlet', 'gt turbo'],
+            'honda_integra_dc2': ['integra', 'dc2', 'type r'],
+            'nissan_200sx_s14_s15': ['200sx', 'silvia', 's14', 's15'],
+            'nissan_350z': ['350z'],
+            'mazda_mx5_na_nb': ['mx-5', 'mx5', 'miata', 'eunos'],
+            'toyota_mr2_sw20': ['mr2'],
+            'ford_sierra_cosworth': ['sierra', 'cosworth'],
+            'ford_escort_rs_turbo': ['escort', 'rs turbo'],
         }
         keywords = model_keywords.get(model_type, [model_name])
         max_price = config.get('max_price', 999999)
@@ -1042,6 +1188,16 @@ class PistonHeadsScraper:
             'bmw_e60_535d': ['535d', '535 '],
             'bmw_f30_330d': ['330d'],
             'bmw_f30_335d': ['335d'],
+            'mitsubishi_evo': ['evo', 'evolution'],
+            'subaru_impreza_wrx': ['wrx', 'sti', 'impreza'],
+            'toyota_starlet_glanza': ['glanza', 'starlet', 'gt turbo'],
+            'honda_integra_dc2': ['integra', 'dc2', 'type r'],
+            'nissan_200sx_s14_s15': ['200sx', 'silvia', 's14', 's15'],
+            'nissan_350z': ['350z'],
+            'mazda_mx5_na_nb': ['mx-5', 'mx5', 'miata', 'eunos'],
+            'toyota_mr2_sw20': ['mr2'],
+            'ford_sierra_cosworth': ['sierra', 'cosworth'],
+            'ford_escort_rs_turbo': ['escort', 'rs turbo'],
         }
         keywords = model_keywords.get(model_type, [config.get('model', '').lower()])
         max_price = config.get('max_price', 999999)
