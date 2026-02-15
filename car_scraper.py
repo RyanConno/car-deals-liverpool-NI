@@ -102,6 +102,18 @@ TARGET_CARS = {
     }
 }
 
+# Fallback images per model (Wikimedia Commons / free stock)
+MODEL_IMAGES = {
+    'peugeot_306_dturbo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Peugeot_306_front_20080822.jpg/640px-Peugeot_306_front_20080822.jpg',
+    'lexus_is200': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg/640px-1999-2005_Lexus_IS_200_%28GXE10R%29_sedan_01.jpg',
+    'bmw_e46_330': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/BMW_E46_Coup%C3%A9_front_20080111.jpg/640px-BMW_E46_Coup%C3%A9_front_20080111.jpg',
+    'honda_civic_ep3_type_r': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Honda_Civic_Type_R_%28EP3%29.jpg/640px-Honda_Civic_Type_R_%28EP3%29.jpg',
+    'bmw_e60_530d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/BMW_E60_front_20080417.jpg/640px-BMW_E60_front_20080417.jpg',
+    'bmw_e60_535d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/BMW_E60_front_20080417.jpg/640px-BMW_E60_front_20080417.jpg',
+    'bmw_f30_330d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/BMW_F30_320d_Sportline_Mineralgrau.jpg/640px-BMW_F30_320d_Sportline_Mineralgrau.jpg',
+    'bmw_f30_335d': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/BMW_F30_320d_Sportline_Mineralgrau.jpg/640px-BMW_F30_320d_Sportline_Mineralgrau.jpg',
+}
+
 # Headers to mimic a real browser
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -210,6 +222,7 @@ class CarListing:
         self.year = data.get('year', '')
         self.mileage = data.get('mileage', '')
         self.source = data.get('source', '')
+        self.image = data.get('image', '') or MODEL_IMAGES.get(self.model_type, '')
 
         car_config = TARGET_CARS.get(self.model_type, {})
         self.ni_markup = car_config.get('ni_markup', 0)
@@ -416,6 +429,17 @@ class AutoTraderScraper:
                     year = str(item.get('year', '') or item.get('registrationYear', ''))
                     mileage = str(item.get('mileage', '') or item.get('odometerReading', ''))
 
+                    # Try to get image
+                    image = ''
+                    img_data = item.get('images', item.get('imageUrls', item.get('photos', [])))
+                    if isinstance(img_data, list) and img_data:
+                        first_img = img_data[0]
+                        image = first_img if isinstance(first_img, str) else first_img.get('url', first_img.get('src', ''))
+                    elif isinstance(img_data, str):
+                        image = img_data
+                    if not image:
+                        image = item.get('imageUrl', item.get('image', item.get('thumbnailUrl', '')))
+
                     if price > 0:
                         listings.append(CarListing({
                             'model_type': model_type,
@@ -426,7 +450,8 @@ class AutoTraderScraper:
                             'url': url,
                             'year': year or 'Unknown',
                             'mileage': mileage or 'Unknown',
-                            'source': 'AutoTrader'
+                            'source': 'AutoTrader',
+                            'image': image
                         }))
                 except Exception:
                     continue
@@ -461,6 +486,7 @@ class AutoTraderScraper:
                 if isinstance(item, dict):
                     price = extract_price(str(item.get('price', 0)))
                     if price > 0:
+                        image = item.get('imageUrl', item.get('image', item.get('thumbnailUrl', '')))
                         listings.append(CarListing({
                             'model_type': model_type,
                             'title': item.get('title', 'AutoTrader Listing'),
@@ -470,7 +496,8 @@ class AutoTraderScraper:
                             'url': item.get('url', ''),
                             'year': str(item.get('year', 'Unknown')),
                             'mileage': str(item.get('mileage', 'Unknown')),
-                            'source': 'AutoTrader'
+                            'source': 'AutoTrader',
+                            'image': image or ''
                         }))
             except Exception:
                 continue
@@ -514,6 +541,12 @@ class AutoTraderScraper:
                         year_match = re.search(r'(19|20)\d{2}', text)
                         mileage_match = re.search(r'([\d,]+)\s*miles', text, re.IGNORECASE)
 
+                        # Try to get image from listing
+                        image = ''
+                        img_el = article.find('img', src=True)
+                        if img_el:
+                            image = img_el.get('src', '') or img_el.get('data-src', '')
+
                         listings.append(CarListing({
                             'model_type': model_type,
                             'title': title,
@@ -523,7 +556,8 @@ class AutoTraderScraper:
                             'url': url,
                             'year': year_match.group() if year_match else 'Unknown',
                             'mileage': mileage_match.group(1) if mileage_match else 'Unknown',
-                            'source': 'AutoTrader'
+                            'source': 'AutoTrader',
+                            'image': image
                         }))
                     except Exception:
                         continue
@@ -610,6 +644,11 @@ class GumtreeScraper:
                     location = item.get('location', 'Liverpool')
                     if isinstance(location, dict):
                         location = location.get('name', 'Liverpool')
+                    image = item.get('imageUrl', item.get('image', item.get('thumbnailUrl', '')))
+                    img_list = item.get('images', item.get('imageUrls', []))
+                    if not image and isinstance(img_list, list) and img_list:
+                        first = img_list[0]
+                        image = first if isinstance(first, str) else first.get('url', first.get('src', ''))
                     listings.append(CarListing({
                         'model_type': model_type,
                         'title': item.get('title', 'Gumtree Listing'),
@@ -619,7 +658,8 @@ class GumtreeScraper:
                         'url': item.get('url', ''),
                         'year': str(item.get('year', 'Unknown')),
                         'mileage': str(item.get('mileage', 'Unknown')),
-                        'source': 'Gumtree'
+                        'source': 'Gumtree',
+                        'image': image or ''
                     }))
             except Exception:
                 continue
@@ -661,6 +701,11 @@ class GumtreeScraper:
                         year_match = re.search(r'(19|20)\d{2}', text)
                         mileage_match = re.search(r'([\d,]+)\s*(miles|mi)', text, re.IGNORECASE)
 
+                        image = ''
+                        img_el = el.find('img', src=True)
+                        if img_el:
+                            image = img_el.get('src', '') or img_el.get('data-src', '')
+
                         listings.append(CarListing({
                             'model_type': model_type,
                             'title': title,
@@ -670,7 +715,8 @@ class GumtreeScraper:
                             'url': url,
                             'year': year_match.group() if year_match else 'Unknown',
                             'mileage': mileage_match.group(1) if mileage_match else 'Unknown',
-                            'source': 'Gumtree'
+                            'source': 'Gumtree',
+                            'image': image
                         }))
                     except Exception:
                         continue
@@ -767,6 +813,11 @@ class PistonHeadsScraper:
                     url = item.get('url', '')
                     if url and not url.startswith('http'):
                         url = f"{self.BASE_URL}{url}"
+                    image = item.get('imageUrl', item.get('image', item.get('thumbnailUrl', '')))
+                    img_list = item.get('images', item.get('imageUrls', []))
+                    if not image and isinstance(img_list, list) and img_list:
+                        first = img_list[0]
+                        image = first if isinstance(first, str) else first.get('url', first.get('src', ''))
                     listings.append(CarListing({
                         'model_type': model_type,
                         'title': item.get('title', 'PistonHeads Listing'),
@@ -776,7 +827,8 @@ class PistonHeadsScraper:
                         'url': url,
                         'year': str(item.get('year', 'Unknown')),
                         'mileage': str(item.get('mileage', 'Unknown')),
-                        'source': 'PistonHeads'
+                        'source': 'PistonHeads',
+                        'image': image or ''
                     }))
             except Exception:
                 continue
@@ -816,6 +868,11 @@ class PistonHeadsScraper:
                         year_match = re.search(r'(19|20)\d{2}', text)
                         mileage_match = re.search(r'([\d,]+)\s*miles', text, re.IGNORECASE)
 
+                        image = ''
+                        img_el = el.find('img', src=True)
+                        if img_el:
+                            image = img_el.get('src', '') or img_el.get('data-src', '')
+
                         listings.append(CarListing({
                             'model_type': model_type,
                             'title': title,
@@ -825,7 +882,8 @@ class PistonHeadsScraper:
                             'url': url,
                             'year': year_match.group() if year_match else 'Unknown',
                             'mileage': mileage_match.group(1) if mileage_match else 'Unknown',
-                            'source': 'PistonHeads'
+                            'source': 'PistonHeads',
+                            'image': image
                         }))
                     except Exception:
                         continue
