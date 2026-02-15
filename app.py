@@ -18,6 +18,15 @@ from car_scraper import CarArbitrageFinder, create_sample_data, OUTPUT_DIR, TARG
 app = Flask(__name__)
 CORS(app)
 
+
+@app.after_request
+def add_no_cache_headers(response):
+    """Prevent browser and proxy caching so code updates show immediately"""
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
 # Global state
 scraper_status = {
     'running': False,
