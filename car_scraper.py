@@ -31,7 +31,7 @@ TARGET_CARS = {
         'make': 'Peugeot', 'model': '306',
         'max_price': 5000,
         'ni_markup': 2700,
-        'min_profit': 2000,
+        'min_profit': 1000,
         'avg_uk_price': 3500,
         'avg_ni_price': 6200
     },
@@ -40,7 +40,7 @@ TARGET_CARS = {
         'make': 'Lexus', 'model': 'IS',
         'max_price': 6000,
         'ni_markup': 2700,
-        'min_profit': 2000,
+        'min_profit': 1000,
         'avg_uk_price': 3000,
         'avg_ni_price': 5700
     },
@@ -49,7 +49,7 @@ TARGET_CARS = {
         'make': 'BMW', 'model': '3 Series',
         'max_price': 8000,
         'ni_markup': 2800,
-        'min_profit': 2000,
+        'min_profit': 1000,
         'avg_uk_price': 5000,
         'avg_ni_price': 7800
     },
@@ -58,7 +58,7 @@ TARGET_CARS = {
         'make': 'Honda', 'model': 'Civic',
         'max_price': 12000,
         'ni_markup': 3500,
-        'min_profit': 2000,
+        'min_profit': 1000,
         'avg_uk_price': 7500,
         'avg_ni_price': 11000,
         'year_min': 2001, 'year_max': 2005,
@@ -69,7 +69,7 @@ TARGET_CARS = {
         'make': 'BMW', 'model': '5 Series',
         'max_price': 7000,
         'ni_markup': 2700,
-        'min_profit': 2000,
+        'min_profit': 1000,
         'avg_uk_price': 4500,
         'avg_ni_price': 7200
     },
@@ -78,7 +78,7 @@ TARGET_CARS = {
         'make': 'BMW', 'model': '5 Series',
         'max_price': 9000,
         'ni_markup': 2800,
-        'min_profit': 2000,
+        'min_profit': 1000,
         'avg_uk_price': 5500,
         'avg_ni_price': 8300
     },
@@ -87,7 +87,7 @@ TARGET_CARS = {
         'make': 'BMW', 'model': '3 Series',
         'max_price': 18000,
         'ni_markup': 3000,
-        'min_profit': 2000,
+        'min_profit': 1000,
         'avg_uk_price': 12000,
         'avg_ni_price': 15000
     },
@@ -96,7 +96,7 @@ TARGET_CARS = {
         'make': 'BMW', 'model': '3 Series',
         'max_price': 22000,
         'ni_markup': 3500,
-        'min_profit': 2000,
+        'min_profit': 1000,
         'avg_uk_price': 15000,
         'avg_ni_price': 18500
     }
