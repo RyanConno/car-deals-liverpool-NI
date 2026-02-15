@@ -350,8 +350,9 @@ def index():
         </div>
 
         <div class="api-docs">
-            <h2>📡 API Endpoints</h2>
-            <p style="color: #888; margin-bottom: 15px;">Access car deals programmatically:</p>
+            <h2>📡 Quick Links</h2>
+            <p style="color: #888; margin-bottom: 15px;">Direct access to tools and searches:</p>
+            <div class="api-endpoint"><a href="/search-links" style="color: #00ff88; text-decoration: none;">🔗 Quick Search Links - Browse cars on AutoTrader, Gumtree, PistonHeads</a></div>
             <div class="api-endpoint">GET /api/deals - Get all current deals (JSON)</div>
             <div class="api-endpoint">GET /api/status - Get scraper status</div>
             <div class="api-endpoint">POST /api/scrape?demo=true - Run scraper</div>
@@ -544,6 +545,264 @@ def get_models():
 def health():
     """Health check endpoint for load balancers"""
     return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
+
+
+@app.route('/search-links')
+def search_links():
+    """Generate direct search links to car websites"""
+    from urllib.parse import urlencode
+
+    car_models = []
+    for model_key, config in TARGET_CARS.items():
+        search_term = config['search_terms'][0]  # Use first search term
+        max_price = config['max_price']
+
+        # AutoTrader link
+        autotrader_params = {
+            'postcode': 'L1',
+            'radius': '200',
+            'price-to': str(max_price),
+            'sort': 'price-asc'
+        }
+        autotrader_url = f"https://www.autotrader.co.uk/car-search?{urlencode(autotrader_params)}&search={search_term.replace(' ', '+')}"
+
+        # Gumtree link
+        gumtree_params = {
+            'search_category': 'cars',
+            'q': search_term,
+            'search_location': 'Liverpool',
+            'distance': '200',
+            'max_price': str(max_price),
+            'sort': 'price_asc'
+        }
+        gumtree_url = f"https://www.gumtree.com/search?{urlencode(gumtree_params)}"
+
+        # PistonHeads link
+        pistonheads_params = {
+            'keywords': search_term,
+            'price_to': str(max_price)
+        }
+        pistonheads_url = f"https://www.pistonheads.com/classifieds/used-cars?{urlencode(pistonheads_params)}"
+
+        car_models.append({
+            'name': model_key.replace('_', ' ').title(),
+            'search_term': search_term,
+            'max_price': max_price,
+            'autotrader': autotrader_url,
+            'gumtree': gumtree_url,
+            'pistonheads': pistonheads_url
+        })
+
+    html = '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Search Links - Car Arbitrage</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: #e0e0e0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px 20px;
+            background: rgba(26, 31, 58, 0.6);
+            border-radius: 16px;
+            border: 1px solid #00ff8833;
+        }
+        h1 {
+            color: #00ff88;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 0 0 30px rgba(0,255,136,0.6);
+        }
+        .subtitle { color: #888; font-size: 1em; }
+        .back-btn {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #6666ff 0%, #4444dd 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102,102,255,0.4);
+        }
+        .controls {
+            background: #1a1f3a;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid #00ff8833;
+        }
+        .controls label {
+            color: #00ff88;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+        .controls input {
+            background: #2a2f4a;
+            color: #e0e0e0;
+            border: 1px solid #00ff8833;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin: 5px;
+            width: 120px;
+        }
+        .controls button {
+            background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
+            color: #0a0e27;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .car-section {
+            background: #1a1f3a;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid #00ff8833;
+        }
+        .car-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #2a2f4a;
+        }
+        .car-name {
+            font-size: 1.5em;
+            color: #00ff88;
+            font-weight: 700;
+        }
+        .car-info {
+            color: #888;
+            font-size: 0.9em;
+        }
+        .links-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        .site-link {
+            background: linear-gradient(135deg, #2a2f4a 0%, #3a3f5a 100%);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #00ff8844;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: block;
+        }
+        .site-link:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,255,136,0.3);
+            border-color: #00ff88;
+        }
+        .site-name {
+            font-size: 1.2em;
+            color: #6666ff;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .site-desc {
+            color: #aaa;
+            font-size: 0.85em;
+            margin-bottom: 12px;
+        }
+        .open-btn {
+            display: inline-block;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #6666ff 0%, #4444dd 100%);
+            color: white;
+            border-radius: 6px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔗 Quick Search Links</h1>
+            <p class="subtitle">Direct links to car listings with pre-filled search criteria</p>
+            <a href="/" class="back-btn">← Back to Dashboard</a>
+        </header>
+
+        <div class="controls">
+            <label>📍 Location:</label>
+            <input type="text" id="location" value="Liverpool" placeholder="Liverpool">
+
+            <label>📏 Radius:</label>
+            <input type="number" id="radius" value="200" placeholder="200"> miles
+
+            <button onclick="updateLinks()">🔄 Update Links</button>
+        </div>
+
+        <div id="cars-list">
+    '''
+
+    for car in car_models:
+        html += f'''
+        <div class="car-section">
+            <div class="car-header">
+                <div>
+                    <div class="car-name">{car['name']}</div>
+                    <div class="car-info">Search: "{car['search_term']}" | Max Price: £{car['max_price']:,}</div>
+                </div>
+            </div>
+            <div class="links-grid">
+                <a href="{car['autotrader']}" target="_blank" class="site-link">
+                    <div class="site-name">🚗 AutoTrader UK</div>
+                    <div class="site-desc">UK's largest digital automotive marketplace</div>
+                    <span class="open-btn">Open Search →</span>
+                </a>
+                <a href="{car['gumtree']}" target="_blank" class="site-link">
+                    <div class="site-name">📋 Gumtree</div>
+                    <div class="site-desc">Free classified ads - often bargains here</div>
+                    <span class="open-btn">Open Search →</span>
+                </a>
+                <a href="{car['pistonheads']}" target="_blank" class="site-link">
+                    <div class="site-name">🏎️ PistonHeads</div>
+                    <div class="site-desc">Enthusiast cars and performance vehicles</div>
+                    <span class="open-btn">Open Search →</span>
+                </a>
+            </div>
+        </div>
+        '''
+
+    html += '''
+        </div>
+    </div>
+
+    <script>
+        function updateLinks() {
+            const location = document.getElementById('location').value;
+            const radius = document.getElementById('radius').value;
+
+            // Reload page with new parameters
+            window.location.href = `/search-links?location=${encodeURIComponent(location)}&radius=${radius}`;
+        }
+    </script>
+</body>
+</html>
+    '''
+
+    return html
 
 
 if __name__ == '__main__':

@@ -27,135 +27,40 @@ OUTPUT_DIR = "./car_deals"
 COSTS_PER_CAR = 650  # Ferry £200 + Fuel £100 (longer trips) + Insurance £250 + Admin £100
 
 # Target models with search terms and profit expectations
-# Updated February 2026 - Based on REAL UK market analysis
-# Research sources: AutoTrader UK, PistonHeads, ClassicValuer.com, DoneDeal.ie
+# Updated February 2026 - Based on verified England vs NI market data
+# Focus on 4 high-demand models with proven arbitrage opportunities
 TARGET_CARS = {
-    # High Volume Opportunities - Lower margins but easier to find
-    'bmw_e46_330': {
-        'search_terms': ['BMW 330i', 'BMW 330ci', 'E46 330', '330i Sport', '330ci M Sport'],
-        'max_price': 10000,      # Increased to catch more
-        'ni_markup': 1000,       # Conservative estimate
-        'min_profit': 200,       # Low barrier - any profit is good
-        'avg_uk_price': 5500,
-        'avg_ni_price': 6700
+    'peugeot_306_dturbo': {
+        'search_terms': ['Peugeot 306 D-Turbo', 'Peugeot 306 DTurbo', '306 D Turbo', '306 Diesel'],
+        'max_price': 5500,       # England range: £3k-£5.5k
+        'ni_markup': 1250,       # NI premium: 15-30% (avg £1,250)
+        'min_profit': 500,       # After £650 costs = £600+ profit
+        'avg_uk_price': 4250,    # Midpoint of £3k-£5.5k
+        'avg_ni_price': 5500     # Midpoint of £4k-£7k (NI range)
     },
     'lexus_is200': {
-        'search_terms': ['Lexus IS200', 'Lexus IS300', 'IS200 Sport', 'IS200 manual'],
-        'max_price': 6000,       # Increased range
-        'ni_markup': 700,        # Conservative
-        'min_profit': 100,       # Very low barrier - high volume play
-        'avg_uk_price': 3200,
-        'avg_ni_price': 4000
+        'search_terms': ['Lexus IS200', 'Lexus IS-200', 'IS200 Sport', 'IS200 manual'],
+        'max_price': 4000,       # England range: £2.5k-£4k
+        'ni_markup': 1000,       # NI premium: 20-30% (avg £1,000)
+        'min_profit': 300,       # After £650 costs = £350+ profit
+        'avg_uk_price': 3250,    # Midpoint of £2.5k-£4k
+        'avg_ni_price': 4250     # Midpoint of £3.5k-£5k (NI range)
     },
-    'bmw_e46_320': {
-        'search_terms': ['BMW 320i', 'BMW 320ci', 'E46 320', '320i Sport'],
-        'max_price': 7000,       # More affordable E46
-        'ni_markup': 600,        # Moderate demand
-        'min_profit': 100,       # Accept small profits
-        'avg_uk_price': 3500,
-        'avg_ni_price': 4100
+    'bmw_e46_330': {
+        'search_terms': ['BMW 330i', 'BMW 330ci', 'E46 330', '330i Sport', '330ci M Sport'],
+        'max_price': 5500,       # England range: £2.5k-£5.5k
+        'ni_markup': 1750,       # NI premium: 25-35% (avg £1,750)
+        'min_profit': 500,       # After £650 costs = £1,100+ profit
+        'avg_uk_price': 4000,    # Midpoint of £2.5k-£5.5k
+        'avg_ni_price': 5750     # Midpoint of £4k-£7.5k (NI range)
     },
-    'mazda_mx5': {
-        'search_terms': ['Mazda MX-5', 'Mazda MX5', 'Miata', 'MX5 1.8'],
-        'max_price': 8000,       # Popular drift platform
-        'ni_markup': 600,        # Good NI demand
-        'min_profit': 100,       # Low barrier
-        'avg_uk_price': 4500,
-        'avg_ni_price': 5100
-    },
-    'nissan_350z': {
-        'search_terms': ['Nissan 350Z', '350Z GT', 'Nissan 370Z', '350Z manual'],
-        'max_price': 18000,      # Increased range
-        'ni_markup': 1500,       # Popular platform
-        'min_profit': 500,       # Reasonable profit
-        'avg_uk_price': 10000,
-        'avg_ni_price': 11800
-    },
-
-    # Medium Value Opportunities
-    'bmw_e36_328': {
-        'search_terms': ['BMW E36 328i', 'E36 328i Sport', 'E36 328'],
-        'max_price': 8000,       # Increased
-        'ni_markup': 800,
-        'min_profit': 200,
-        'avg_uk_price': 4500,
-        'avg_ni_price': 5500
-    },
-    'honda_civic_type_r': {
-        'search_terms': ['Honda Civic Type R', 'Civic Type-R EP3', 'Civic Type-R FN2', 'EP3 Type R'],
-        'max_price': 16000,      # Increased
-        'ni_markup': 1500,       # Conservative
-        'min_profit': 500,
-        'avg_uk_price': 11000,
-        'avg_ni_price': 12800
-    },
-    'mazda_rx8': {
-        'search_terms': ['Mazda RX-8', 'Mazda RX8', 'RX8 R3'],
-        'max_price': 8000,       # Affordable rotary
-        'ni_markup': 700,
-        'min_profit': 200,
-        'avg_uk_price': 5000,
-        'avg_ni_price': 5700
-    },
-
-    # High Value Opportunities - Bigger margins but rarer
-    'bmw_e36_m3': {
-        'search_terms': ['BMW E36 M3', 'E36 M3 Evolution', 'E36 M3 3.2', 'M3 E36'],
-        'max_price': 22000,      # Increased
-        'ni_markup': 2500,       # Conservative
-        'min_profit': 1200,      # Need decent margin for high value
-        'avg_uk_price': 18000,
-        'avg_ni_price': 21000
-    },
-    'nissan_200sx': {
-        'search_terms': ['Nissan 200SX', 'Nissan Silvia', '200SX S13', '200SX S14', '200SX S15', 'Silvia S14'],
-        'max_price': 20000,      # Increased for rare finds
-        'ni_markup': 2000,       # Conservative for safety
-        'min_profit': 1000,      # Lower barrier
-        'avg_uk_price': 14700,
-        'avg_ni_price': 17200
-    },
-
-    # Premium JDM - Rare but high profit
-    'nissan_skyline_r33': {
-        'search_terms': ['Nissan Skyline R33', 'R33 GTS-T', 'Skyline R33', 'R33 GTR'],
-        'max_price': 35000,      # Increased
-        'ni_markup': 3500,       # Conservative
-        'min_profit': 2000,      # Need decent margin
-        'avg_uk_price': 22000,
-        'avg_ni_price': 26000
-    },
-    'nissan_skyline_r32': {
-        'search_terms': ['Nissan Skyline R32', 'R32 GTR', 'R32 GTS-T', 'Skyline R32'],
-        'max_price': 45000,      # Increased for GTR finds
-        'ni_markup': 4000,       # Conservative
-        'min_profit': 2500,      # Need buffer
-        'avg_uk_price': 35000,
-        'avg_ni_price': 40000
-    },
-    'mazda_rx7_fd': {
-        'search_terms': ['Mazda RX-7 FD', 'Mazda RX7 FD3S', 'RX-7 Import', 'FD RX7'],
-        'max_price': 35000,      # Increased
-        'ni_markup': 3500,       # Conservative
-        'min_profit': 2000,
-        'avg_uk_price': 28000,
-        'avg_ni_price': 32000
-    },
-    'mazda_rx7_fc': {
-        'search_terms': ['Mazda RX-7 FC', 'Mazda RX7 FC3S', 'FC RX7'],
-        'max_price': 12000,      # Increased
-        'ni_markup': 1200,       # Conservative
-        'min_profit': 600,
-        'avg_uk_price': 9000,
-        'avg_ni_price': 10500
-    },
-    'toyota_supra': {
-        'search_terms': ['Toyota Supra', 'Supra MK4', 'Supra Twin Turbo', 'Supra NA'],
-        'max_price': 60000,      # Increased
-        'ni_markup': 5000,       # Conservative
-        'min_profit': 3000,      # High value car
-        'avg_uk_price': 42000,
-        'avg_ni_price': 48000
+    'honda_civic_ep3_type_r': {
+        'search_terms': ['Honda Civic Type R', 'Civic Type-R EP3', 'EP3 Type R', 'Civic Type R EP3'],
+        'max_price': 9000,       # England range: £3k-£9k
+        'ni_markup': 2500,       # NI premium: 25-40% (avg £2,500)
+        'min_profit': 1000,      # After £650 costs = £1,850+ profit
+        'avg_uk_price': 6000,    # Midpoint of £3k-£9k
+        'avg_ni_price': 8500     # Midpoint of £5k-£12k (NI range)
     }
 }
 
@@ -1161,105 +1066,116 @@ class CarArbitrageFinder:
 
 
 def create_sample_data():
-    """Create sample data for demonstration with updated 2026 prices"""
+    """Create sample data for demonstration - focused on 4 high-demand models"""
     samples = [
         {
-            'model_type': 'bmw_e46_330',
-            'title': 'BMW E46 330Ci Sport Manual - Full History',
-            'price': 9500,
+            'model_type': 'peugeot_306_dturbo',
+            'title': 'Peugeot 306 D-Turbo - 3 Door - Full Service History',
+            'price': 3800,
             'location': 'Manchester',
             'coords': (53.4808, -2.2426),
-            'url': 'https://www.autotrader.co.uk/car-details/202602120001',
-            'year': '2004',
-            'mileage': '89,000',
+            'url': 'https://www.gumtree.com/p/cars/peugeot-306-d-turbo/1234567890',
+            'year': '1999',
+            'mileage': '145,000',
+            'source': 'Gumtree'
+        },
+        {
+            'model_type': 'peugeot_306_dturbo',
+            'title': 'Peugeot 306 DTurbo 3dr - Clean Example',
+            'price': 4200,
+            'location': 'Leeds',
+            'coords': (53.8008, -1.5491),
+            'url': 'https://www.autotrader.co.uk/car-details/202602150001',
+            'year': '2000',
+            'mileage': '128,000',
             'source': 'AutoTrader'
         },
         {
             'model_type': 'lexus_is200',
-            'title': 'Lexus IS200 Sport Manual - Immaculate',
-            'price': 4800,
+            'title': 'Lexus IS200 Sport Manual - Excellent Condition',
+            'price': 3200,
             'location': 'Chester',
             'coords': (53.1908, -2.8908),
-            'url': 'https://www.autotrader.co.uk/car-details/202602120002',
+            'url': 'https://www.autotrader.co.uk/car-details/202602150002',
             'year': '2003',
             'mileage': '112,000',
             'source': 'AutoTrader'
         },
         {
-            'model_type': 'nissan_200sx',
-            'title': 'Nissan 200SX S14a Kouki - Original SR20DET',
-            'price': 18500,
-            'location': 'Preston',
-            'coords': (53.7632, -2.7031),
-            'url': 'https://www.pistonheads.com/classifieds/used-cars/nissan/200sx/nissan-200sx-s14-kouki-sr20det-1999/15234567',
-            'year': '1999',
-            'mileage': '95,000',
-            'source': 'PistonHeads'
-        },
-        {
-            'model_type': 'bmw_e36_328',
-            'title': 'BMW E36 328i Sport Coupe - Manual',
-            'price': 5800,
-            'location': 'Warrington',
-            'coords': (53.3900, -2.5970),
-            'url': 'https://www.gumtree.com/p/cars-vans-motorbikes/bmw-e36-328i-sport/1487654321',
-            'year': '1998',
-            'mileage': '145,000',
+            'model_type': 'lexus_is200',
+            'title': 'Lexus IS-200 SE Manual 6 Speed - FSH',
+            'price': 2900,
+            'location': 'Birmingham',
+            'coords': (52.4862, -1.8904),
+            'url': 'https://www.gumtree.com/p/cars/lexus-is200-manual/1234567891',
+            'year': '2002',
+            'mileage': '135,000',
             'source': 'Gumtree'
         },
         {
-            'model_type': 'honda_civic_type_r',
-            'title': 'Honda Civic Type R EP3 Championship White',
-            'price': 8800,
+            'model_type': 'bmw_e46_330',
+            'title': 'BMW E46 330i M Sport Manual - Full History',
+            'price': 4500,
+            'location': 'Preston',
+            'coords': (53.7632, -2.7031),
+            'url': 'https://www.autotrader.co.uk/car-details/202602150003',
+            'year': '2004',
+            'mileage': '95,000',
+            'source': 'AutoTrader'
+        },
+        {
+            'model_type': 'bmw_e46_330',
+            'title': 'BMW 330ci E46 Coupe Manual - Excellent',
+            'price': 3800,
+            'location': 'Sheffield',
+            'coords': (53.3811, -1.4701),
+            'url': 'https://www.pistonheads.com/classifieds/used-cars/bmw/e46/12345678',
+            'year': '2003',
+            'mileage': '118,000',
+            'source': 'PistonHeads'
+        },
+        {
+            'model_type': 'honda_civic_ep3_type_r',
+            'title': 'Honda Civic Type R EP3 - Championship White - FSH',
+            'price': 7200,
             'location': 'Bolton',
             'coords': (53.5768, -2.4282),
-            'url': 'https://www.autotrader.co.uk/car-details/202602120003',
+            'url': 'https://www.autotrader.co.uk/car-details/202602150004',
             'year': '2005',
-            'mileage': '78,000',
+            'mileage': '82,000',
             'source': 'AutoTrader'
         },
         {
-            'model_type': 'nissan_skyline_r33',
-            'title': 'Nissan Skyline R33 GTS-T Type M - Fresh Import',
-            'price': 24000,
+            'model_type': 'honda_civic_ep3_type_r',
+            'title': 'Honda Civic EP3 Type-R - Recaro Seats - HPI Clear',
+            'price': 6500,
+            'location': 'Warrington',
+            'coords': (53.3900, -2.5970),
+            'url': 'https://www.pistonheads.com/classifieds/used-cars/honda/civic/12345679',
+            'year': '2004',
+            'mileage': '98,000',
+            'source': 'PistonHeads'
+        },
+        {
+            'model_type': 'peugeot_306_dturbo',
+            'title': 'Peugeot 306 D Turbo - Lowered - Good Runner',
+            'price': 3500,
+            'location': 'Liverpool',
+            'coords': (53.4084, -2.9916),
+            'url': 'https://www.gumtree.com/p/cars/peugeot-306-d-turbo-modified/1234567892',
+            'year': '1998',
+            'mileage': '167,000',
+            'source': 'Gumtree'
+        },
+        {
+            'model_type': 'lexus_is200',
+            'title': 'Lexus IS200 2.0 SE Manual - 12 Months MOT',
+            'price': 3600,
             'location': 'Blackpool',
             'coords': (53.8175, -3.0357),
-            'url': 'https://www.pistonheads.com/classifieds/used-cars/nissan/skyline/12345',
-            'year': '1996',
-            'mileage': '78,000',
-            'source': 'PistonHeads'
-        },
-        {
-            'model_type': 'mazda_rx7_fd',
-            'title': 'Mazda RX-7 FD3S Twin Turbo - JDM Import',
-            'price': 26000,
-            'location': 'Manchester',
-            'coords': (53.4808, -2.2426),
-            'url': 'https://www.pistonheads.com/classifieds/used-cars/mazda/rx-7/12346',
-            'year': '1993',
-            'mileage': '65,000',
-            'source': 'PistonHeads'
-        },
-        {
-            'model_type': 'bmw_e36_m3',
-            'title': 'BMW E36 M3 3.2 Evolution - Manual',
-            'price': 16500,
-            'location': 'Lancaster',
-            'coords': (54.0466, -2.8007),
-            'url': 'https://www.autotrader.co.uk/car-details/202602120005',
-            'year': '1997',
-            'mileage': '98,000',
-            'source': 'AutoTrader'
-        },
-        {
-            'model_type': 'nissan_350z',
-            'title': 'Nissan 350Z GT Manual - Low Miles',
-            'price': 10500,
-            'location': 'Wigan',
-            'coords': (53.5450, -2.6318),
-            'url': 'https://www.autotrader.co.uk/car-details/202602120006',
-            'year': '2007',
-            'mileage': '52,000',
+            'url': 'https://www.autotrader.co.uk/car-details/202602150005',
+            'year': '2004',
+            'mileage': '124,000',
             'source': 'AutoTrader'
         }
     ]
