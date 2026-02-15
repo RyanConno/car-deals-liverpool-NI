@@ -29,74 +29,76 @@ TARGET_CARS = {
     'peugeot_306_dturbo': {
         'search_terms': ['Peugeot 306 D-Turbo', 'Peugeot 306 DTurbo', '306 D Turbo', '306 Diesel'],
         'make': 'Peugeot', 'model': '306',
-        'max_price': 10000,
-        'ni_markup': 1250,
-        'min_profit': 0,
-        'avg_uk_price': 4250,
-        'avg_ni_price': 5500
+        'max_price': 5000,
+        'ni_markup': 2700,
+        'min_profit': 2000,
+        'avg_uk_price': 3500,
+        'avg_ni_price': 6200
     },
     'lexus_is200': {
         'search_terms': ['Lexus IS200', 'Lexus IS-200', 'IS200 Sport', 'IS200 manual'],
         'make': 'Lexus', 'model': 'IS',
-        'max_price': 8000,
-        'ni_markup': 1000,
-        'min_profit': 0,
-        'avg_uk_price': 3250,
-        'avg_ni_price': 4250
+        'max_price': 6000,
+        'ni_markup': 2700,
+        'min_profit': 2000,
+        'avg_uk_price': 3000,
+        'avg_ni_price': 5700
     },
     'bmw_e46_330': {
         'search_terms': ['BMW 330i', 'BMW 330ci', 'E46 330', '330i Sport', '330ci M Sport'],
         'make': 'BMW', 'model': '3 Series',
-        'max_price': 12000,
-        'ni_markup': 1750,
-        'min_profit': 0,
-        'avg_uk_price': 4000,
-        'avg_ni_price': 5750
+        'max_price': 8000,
+        'ni_markup': 2800,
+        'min_profit': 2000,
+        'avg_uk_price': 5000,
+        'avg_ni_price': 7800
     },
     'honda_civic_ep3_type_r': {
-        'search_terms': ['Honda Civic Type R', 'Civic Type-R EP3', 'EP3 Type R', 'Civic Type R EP3'],
+        'search_terms': ['Honda Civic Type R EP3', 'Civic EP3 Type R', 'EP3 Type R', 'Honda Civic Type R'],
         'make': 'Honda', 'model': 'Civic',
-        'max_price': 18000,
-        'ni_markup': 2500,
-        'min_profit': 0,
-        'avg_uk_price': 6000,
-        'avg_ni_price': 8500
+        'max_price': 12000,
+        'ni_markup': 3500,
+        'min_profit': 2000,
+        'avg_uk_price': 7500,
+        'avg_ni_price': 11000,
+        'year_min': 2001, 'year_max': 2005,
+        'exclude_keywords': ['fn2', 'fk2', 'fk8', 'fl5', '2006', '2007', '2008', '2009', '2010', '2011']
     },
     'bmw_e60_530d': {
         'search_terms': ['BMW 530d', 'E60 530d', '530d Sport', 'BMW 530 diesel'],
         'make': 'BMW', 'model': '5 Series',
-        'max_price': 10000,
-        'ni_markup': 1450,
-        'min_profit': 0,
-        'avg_uk_price': 3800,
-        'avg_ni_price': 5250
+        'max_price': 7000,
+        'ni_markup': 2700,
+        'min_profit': 2000,
+        'avg_uk_price': 4500,
+        'avg_ni_price': 7200
     },
     'bmw_e60_535d': {
         'search_terms': ['BMW 535d', 'E60 535d', '535d M-Sport', 'BMW 535 diesel'],
         'make': 'BMW', 'model': '5 Series',
-        'max_price': 13000,
-        'ni_markup': 2250,
-        'min_profit': 0,
-        'avg_uk_price': 5250,
-        'avg_ni_price': 7500
+        'max_price': 9000,
+        'ni_markup': 2800,
+        'min_profit': 2000,
+        'avg_uk_price': 5500,
+        'avg_ni_price': 8300
     },
     'bmw_f30_330d': {
         'search_terms': ['BMW 330d', 'F30 330d', '330d Sport', '330d M-Sport'],
         'make': 'BMW', 'model': '3 Series',
-        'max_price': 25000,
-        'ni_markup': 2750,
-        'min_profit': 0,
-        'avg_uk_price': 10500,
-        'avg_ni_price': 13250
+        'max_price': 18000,
+        'ni_markup': 3000,
+        'min_profit': 2000,
+        'avg_uk_price': 12000,
+        'avg_ni_price': 15000
     },
     'bmw_f30_335d': {
         'search_terms': ['BMW 335d', 'F30 335d', '335d M-Sport', '335d xDrive'],
         'make': 'BMW', 'model': '3 Series',
-        'max_price': 35000,
-        'ni_markup': 3000,
-        'min_profit': 0,
-        'avg_uk_price': 14250,
-        'avg_ni_price': 17250
+        'max_price': 22000,
+        'ni_markup': 3500,
+        'min_profit': 2000,
+        'avg_uk_price': 15000,
+        'avg_ni_price': 18500
     }
 }
 
@@ -226,6 +228,28 @@ class CarListing:
     def is_profitable(self) -> bool:
         """Check if this listing meets profit criteria"""
         car_config = TARGET_CARS.get(self.model_type, {})
+
+        # Check exclude keywords (e.g. filter out FN2 from EP3 searches)
+        exclude_keywords = car_config.get('exclude_keywords', [])
+        if exclude_keywords:
+            title_lower = self.title.lower()
+            for kw in exclude_keywords:
+                if kw.lower() in title_lower:
+                    return False
+
+        # Check year range if specified (e.g. EP3 = 2001-2005 only)
+        year_min = car_config.get('year_min')
+        year_max = car_config.get('year_max')
+        if year_min or year_max:
+            try:
+                year_val = int(re.search(r'(19|20)\d{2}', str(self.year)).group())
+                if year_min and year_val < year_min:
+                    return False
+                if year_max and year_val > year_max:
+                    return False
+            except (AttributeError, ValueError, TypeError):
+                pass  # If year can't be parsed, allow it through
+
         return (
             self.price > 0 and
             self.price <= car_config.get('max_price', 999999) and
